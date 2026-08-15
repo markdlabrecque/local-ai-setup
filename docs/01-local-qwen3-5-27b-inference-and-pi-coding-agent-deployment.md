@@ -6,13 +6,34 @@
 
 Deploy the official dense Qwen/Qwen3.5-27B model locally on the RX 6900 XT (16 GiB VRAM), Ryzen 7 9800X3D, and 60 GiB RAM, prioritizing output quality and a minimum 32K context window. Use a current Vulkan-enabled llama.cpp build and its router because Pi 0.84.1 supports it natively. Start with an official-model GGUF Q8_0 quantization (for example unsloth/Qwen3.5-27B-GGUF or bartowski/Qwen_Qwen3.5-27B-GGUF after verifying provenance, tokenizer/chat template, and checksums); retain Q6_K as a tested fallback if Q8_0 plus 32K context cannot operate reliably within system memory. Offload as many layers as fit in VRAM while leaving desktop headroom, place remaining weights and KV cache in RAM, bind the API to localhost, and validate general inference, reasoning controls, streaming, and multi-turn tool calling through Pi. The work includes reproducible scripts, a user-level systemd service, Pi configuration, health checks, benchmarks, tuning records, and operational documentation.
 
+## GitHub Issue Tracker
+
+Implementation is tracked in [GitHub issues](https://github.com/markdlabrecque/local-ai-setup/issues):
+
+- [#1](https://github.com/markdlabrecque/local-ai-setup/issues/1) — Vulkan-enabled llama.cpp setup script (completed)
+- [#2](https://github.com/markdlabrecque/local-ai-setup/issues/2) — Hardware baseline and acceptance criteria
+- [#3](https://github.com/markdlabrecque/local-ai-setup/issues/3) — Model artifacts and memory budget
+- [#4](https://github.com/markdlabrecque/local-ai-setup/issues/4) — Deterministic model downloads
+- [#5](https://github.com/markdlabrecque/local-ai-setup/issues/5) — Direct llama.cpp baseline
+- [#6](https://github.com/markdlabrecque/local-ai-setup/issues/6) — Hybrid inference tuning
+- [#7](https://github.com/markdlabrecque/local-ai-setup/issues/7) — Router configuration and presets
+- [#8](https://github.com/markdlabrecque/local-ai-setup/issues/8) — systemd user service
+- [#9](https://github.com/markdlabrecque/local-ai-setup/issues/9) — Health checks and API smoke tests
+- [#10](https://github.com/markdlabrecque/local-ai-setup/issues/10) — Pi integration
+- [#11](https://github.com/markdlabrecque/local-ai-setup/issues/11) — Evaluation suite
+- [#12](https://github.com/markdlabrecque/local-ai-setup/issues/12) — Configuration benchmarks
+- [#13](https://github.com/markdlabrecque/local-ai-setup/issues/13) — Production profiles
+- [#14](https://github.com/markdlabrecque/local-ai-setup/issues/14) — Endurance and recovery testing
+- [#15](https://github.com/markdlabrecque/local-ai-setup/issues/15) — Operator guide
+- [#16](https://github.com/markdlabrecque/local-ai-setup/issues/16) — End-to-end verification
+
 ## Action Plan
 
 1. [ ] Record a reproducible hardware and software baseline: RX 6900 XT identity and 16 GiB VRAM, RADV/Mesa and Vulkan versions, CPU/RAM/swap/disk, kernel, Pi version, and idle desktop VRAM usage; reserve explicit RAM, VRAM, and disk safety margins before testing.
 2. [ ] Define acceptance criteria in project documentation: successful 32K-context startup, stable streamed generation, valid parallel/sequential tool calls in Pi, no OOM or swap thrashing during the target workload, acceptable response quality on a fixed prompt suite, and measured prompt-processing/generation throughput and time-to-first-token.
 3. [ ] Select and pin the official dense `Qwen/Qwen3.5-27B` base/instruct release and a trusted GGUF conversion. Prefer Q8_0 as the highest practical quantized quality tier on this 60 GiB system, document repository revision and SHA-256 checksums, and also identify a Q6_K artifact as the fallback rather than using an MoE, abliterated, distilled, or otherwise modified derivative.
 4. [ ] Estimate and document memory requirements for Q8_0 weights, llama.cpp runtime overhead, a 32K KV cache, and the OS/desktop. Verify the estimate against available RAM and VRAM; reject BF16 as the default if it leaves inadequate runtime headroom, and establish explicit thresholds for falling back from Q8_0 to Q6_K or reducing GPU layers without dropping below 32K context.
-5. [ ] Create a reproducible installer/build script that obtains a pinned current llama.cpp release or source revision with Vulkan enabled, verifies the resulting `llama-server` backend and GPU discovery, and avoids introducing ROCm unless Vulkan benchmarking demonstrates a concrete deficiency. Record all package and build dependencies.
+5. [x] Create a reproducible installer/build script that obtains a pinned current llama.cpp release or source revision with Vulkan enabled, verifies the resulting `llama-server` backend and GPU discovery, and avoids introducing ROCm unless Vulkan benchmarking demonstrates a concrete deficiency. Record all package and build dependencies. ([#1](https://github.com/markdlabrecque/local-ai-setup/issues/1))
 6. [ ] Create a deterministic model-download script and model directory layout compatible with llama.cpp router mode. Support resumable downloads, checksum verification, shard placement, configurable model/cache paths, and sufficient free-space checks before downloading Q8_0 and optional Q6_K artifacts.
 7. [ ] Establish a direct llama.cpp baseline outside Pi using `llama-cli` or single-model `llama-server`: confirm the official chat template, Jinja support, thinking/non-thinking behavior, stop tokens, 32K context allocation, streaming, and coherent responses before adding service or Pi integration.
 8. [ ] Tune hybrid GPU/CPU inference systematically. Begin with Vulkan, 32K context, flash attention where supported, conservative batch/ubatch values, and enough GPU layers to leave desktop VRAM headroom; measure several layer-offload and cache-type configurations, monitor VRAM/RAM/swap, and save the best stable quality-preserving settings rather than optimizing only peak tokens per second.
