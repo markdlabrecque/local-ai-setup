@@ -87,8 +87,9 @@ install_packages() {
     for command_name in "${command_names[@]}"; do
       command -v "$command_name" >/dev/null 2>&1 || packages+=("${arch_packages[$command_name]}")
     done
-    # These packages provide the loader, headers, compiler, and AMD Vulkan driver.
-    for package in vulkan-headers vulkan-icd-loader shaderc vulkan-radeon; do
+    # These packages provide the loader, Vulkan/SPIR-V headers, shader compiler,
+    # and AMD Vulkan driver. llama.cpp finds spirv-headers through CMake config.
+    for package in vulkan-headers spirv-headers vulkan-icd-loader shaderc vulkan-radeon; do
       pacman -Q "$package" >/dev/null 2>&1 || packages+=("$package")
     done
     if ((${#packages[@]})); then
@@ -103,7 +104,7 @@ install_packages() {
     for command_name in "${command_names[@]}"; do
       command -v "$command_name" >/dev/null 2>&1 || packages+=("${debian_packages[$command_name]}")
     done
-    for package in libvulkan-dev glslc mesa-vulkan-drivers; do
+    for package in libvulkan-dev spirv-headers glslc mesa-vulkan-drivers; do
       dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'ok installed' || packages+=("$package")
     done
     if ((${#packages[@]})); then
@@ -174,22 +175,23 @@ run cmake -S "$SOURCE_DIR" -B "$BUILD_DIR" -G Ninja \
   -DCMAKE_INSTALL_PREFIX="$PREFIX" \
   -DBUILD_SHARED_LIBS=OFF \
   -DGGML_VULKAN=ON \
-  -DLLAMA_CURL=ON \
   -DLLAMA_BUILD_TESTS=OFF \
-  -DLLAMA_BUILD_EXAMPLES=ON \
+  -DLLAMA_BUILD_EXAMPLES=OFF \
+  -DLLAMA_BUILD_TOOLS=ON \
+  -DLLAMA_BUILD_APP=OFF \
   -DLLAMA_BUILD_SERVER=ON
 
 log "Building llama.cpp"
 run cmake --build "$BUILD_DIR" --parallel "$JOBS" --target llama-cli llama-server llama-bench
 
 log "Installing llama.cpp to $PREFIX"
-run cmake --install "$BUILD_DIR" --prefix "$PREFIX"
-
 for executable in llama-cli llama-server llama-bench; do
+  built_executable="$BUILD_DIR/bin/$executable"
   installed_executable="$PREFIX/bin/$executable"
   if (( ! DRY_RUN )); then
-    [[ -x "$installed_executable" ]] || die "expected executable was not installed: $installed_executable"
+    [[ -x "$built_executable" ]] || die "expected executable was not built: $built_executable"
   fi
+  run install -Dm755 "$built_executable" "$installed_executable"
   run ln -sfn "$installed_executable" "$BIN_DIR/$executable"
 done
 
