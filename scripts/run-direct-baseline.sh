@@ -258,6 +258,10 @@ for card_path in pathlib.Path('/sys/class/drm').glob('card*/device'):
             break
     except OSError:
         pass
+# The verbose Vulkan inventory names the adapter while sysfs supplies the
+# unambiguous PCI association used for its VRAM counter.
+if device != 'unavailable' and vram_pci_id == '1002:73BF':
+    vram_device = 'AMD Radeon RX 6900 XT'
 cmd = ['llama-cli', '--model', pathlib.Path(os.environ['model']).name, '--ctx-size', '32768', '--device', 'Vulkan0', '--gpu-layers', os.environ['gpu_layers'], '--flash-attn', 'on', '--reasoning', 'off', '--temp', '0', '--seed', '42', '--single-turn', '--simple-io', '--verbose', '--no-display-prompt', '--prompt', clean(os.environ['prompt']), '--n-predict', '128']
 result = {'schema_version': 1, 'model': pathlib.Path(os.environ['model']).name, 'model_sha256': os.environ['actual_sha'], 'command': cmd, 'device': device, 'context_tokens': 32768, 'context_confirmed': confirmed_context, 'gpu_layers': int(os.environ['gpu_layers']), 'offload_evidence': offload_evidence, 'reasoning_mode': 'off', 'expected_completion': expected_clean, 'expected_completion_match': expected_match, 'final_section_confirmed': bool(completion) and expected_match, 'stream': {'completion': completion, 'chunks': chunks, 'response_chunks': response_chunks, 'thinking': thinking, 'prompt': clean(prompt_text), 'enabled': bool(response_chunks)}, 'stop_reason': stop, 'stop_event': stop_event, 'timing_evidence': timing_evidence, 'vram_device': vram_device, 'vram_card': vram_card, 'vram_pci_id': vram_pci_id, 'measurement_source': measurement_source, 'swap_activity': {'peak_mib': swap_peak, 'system_used_peak_mib': system_swap_peak, 'pages_in': swap_in_pages, 'pages_out': swap_out_pages}, 'exit_code': int(os.environ['status']), 'timed_out': os.environ['timed_out'] == 'true', 'measurements': measurements, 'model_metadata': metadata, 'startup_log': clean(stderr), 'capture_limits': {'stdout_bytes': int(os.environ['max_stdout_bytes']), 'stderr_bytes': int(os.environ['max_stderr_bytes'])}}
 pathlib.Path(os.environ['output']).write_text(json.dumps(result, indent=2, sort_keys=True) + '\n')
