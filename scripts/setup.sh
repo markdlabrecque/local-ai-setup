@@ -72,6 +72,7 @@ done
 source "$VERSIONS_FILE"
 : "${LLAMA_CPP_REPOSITORY:?missing LLAMA_CPP_REPOSITORY in config/versions.env}"
 : "${LLAMA_CPP_REF:?missing LLAMA_CPP_REF in config/versions.env}"
+: "${LLAMA_CPP_COMMIT:?missing LLAMA_CPP_COMMIT in config/versions.env}"
 
 install_packages() {
   (( SKIP_PACKAGES )) && { log "Skipping distribution package installation"; return; }
@@ -165,7 +166,8 @@ else
   log "Using existing source tree $SOURCE_DIR"
   if (( ! DRY_RUN )); then
     current_ref="$(git -C "$SOURCE_DIR" describe --tags --exact-match 2>/dev/null || true)"
-    [[ "$current_ref" == "$LLAMA_CPP_REF" ]] || die "$SOURCE_DIR is at '${current_ref:-an untagged commit}', expected $LLAMA_CPP_REF; use --force-rebuild"
+    current_commit="$(git -C "$SOURCE_DIR" rev-parse HEAD 2>/dev/null || true)"
+    [[ "$current_ref" == "$LLAMA_CPP_REF" && "$current_commit" == "$LLAMA_CPP_COMMIT"* ]] || die "$SOURCE_DIR is at '${current_ref:-an untagged commit}'/$current_commit, expected $LLAMA_CPP_REF/$LLAMA_CPP_COMMIT; use --force-rebuild"
   fi
 fi
 

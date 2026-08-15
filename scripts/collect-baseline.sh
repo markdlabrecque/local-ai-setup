@@ -47,22 +47,21 @@ mem_value() {
   awk -v key="$1" '$1 == key {print $2 " " $3; found=1} END {if (!found) print "unavailable"}' /proc/meminfo 2>/dev/null
 }
 
-# Prefer the DRM device with the largest non-zero VRAM heap. This selects the
-# target discrete adapter when an integrated adapter also exposes a small heap.
+# Select only the RX 6900 XT PCI identity. Never use the largest heap: an
+# unrelated adapter can have a larger allocation and corrupt this baseline.
+sysfs_root=${BASELINE_SYSFS_ROOT:-/sys}
 target_card=''
 target_vram_file=''
-best_vram_bytes=0
-for card_device in /sys/class/drm/card*/device; do
-  candidate="$card_device/mem_info_vram_total"
-  candidate_bytes=0
-  if [[ -r "$candidate" ]]; then
-    candidate_bytes=$(awk '$1 > 0 {print $1; exit}' "$candidate" 2>/dev/null)
-    [[ "$candidate_bytes" =~ ^[0-9]+$ ]] || candidate_bytes=0
-  fi
-  if (( candidate_bytes > best_vram_bytes )); then
-    best_vram_bytes=$candidate_bytes
+for card_device in "$sysfs_root"/class/drm/card*/device; do
+  [[ -d "$card_device" ]] || continue
+  vendor=''; device_id=''
+  [[ -f "$card_device/vendor" ]] && vendor=$(tr -d '[:space:]' <"$card_device/vendor")
+  [[ -f "$card_device/device" ]] && device_id=$(tr -d '[:space:]' <"$card_device/device")
+  vendor=${vendor#0x}; device_id=${device_id#0x}
+  if [[ "${vendor,,}:${device_id,,}" == '1002:73bf' ]]; then
     target_card=${card_device%/device}
-    target_vram_file=$candidate
+    target_vram_file="$card_device/mem_info_vram_total"
+    break
   fi
 done
 

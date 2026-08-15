@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "model": "Qwen3.5-27B-Q8_0.gguf",
+  "model_sha256": "6b0a101b0a86697fe11eabcc1a7db72699a9f3d4b18b6a1ac75ea3fb2c26c450",
+  "command": ["llama-cli", "--ctx-size", "32768", "--device", "Vulkan0", "--gpu-layers", "20", "--reasoning", "off"],
+  "device": "load: Vulkan0 device=AMD Radeon RX 6900 XT",
+  "vram_device": "AMD Radeon RX 6900 XT",
+  "context_tokens": 32768,
+  "context_confirmed": true,
+  "gpu_layers": 20,
+  "offload_evidence": true,
+  "reasoning_mode": "off",
+  "expected_completion": "LOCAL_AI_BASELINE_OK",
+  "expected_completion_match": true,
+  "final_section_confirmed": true,
+  "stream": {
+    "completion": "LOCAL_AI_BASELINE_OK",
+    "chunks": ["LOCAL_AI_", "BASELINE_OK"],
+    "thinking": "",
+    "enabled": true
+  },
+  "stop_reason": "unknown",
+  "stop_event": "unknown",
+  "timing_evidence": true,
+  "exit_code": 0,
+  "timed_out": false,
+  "measurement_source": "fixture",
+  "measurements": {"ram_mib": 27500, "vram_mib": 10688, "swap_mib": 0, "mem_available_mib": 53296},
+  "swap_activity": {"peak_mib": 0},
+  "model_metadata": ["llama_model_loader: metadata captured"],
+  "startup_log": "Vulkan0 device=AMD Radeon RX 6900 XT\nllama_context: n_ctx = 32768\noffloaded 20 layers\n"
+}

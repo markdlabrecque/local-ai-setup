@@ -45,6 +45,10 @@ All paths can be overridden with the environment variables shown by `./scripts/s
 
 The script currently supports dependency installation on Arch Linux and Debian/Ubuntu. On another distribution, install the prerequisites yourself and use `--skip-packages`.
 
+## Direct baseline
+
+The verified Issue #5 Vulkan/Q8_0 baseline and reproducible command are documented in [`docs/issue-5-direct-baseline-result.md`](docs/issue-5-direct-baseline-result.md).
+
 ## Security
 
 Do not store sudo passwords, API keys, or model-access tokens in this repository. Model files and local `.env` files are ignored by Git.
