@@ -11,6 +11,7 @@ model="$tmp/qwen-Q8_0.gguf"; printf 'fake model bytes\n' >"$model"
 sha=$(sha256sum "$model" | awk '{print $1}')
 cat >"$tmp/fake-llama-cli" <<'EOF'
 #!/usr/bin/env bash
+[[ ${1:-} == --version ]] && { printf 'llama-cli version b10446 (adb55e5)\n'; exit 0; }
 printf 'load: Vulkan0 device=AMD Radeon RX 6900 XT\n' >&2
 printf 'llama_context: n_ctx = 32768\n' >&2
 printf 'Hello streamed completion' | fold -w 5
@@ -64,6 +65,7 @@ expect_reject timeout-zero "$RUNNER" --model "$model" --sha256 "$sha" \
 # Exit 137 from the CLI is not evidence that the supervisor timed out.
 cat >"$tmp/exit-137" <<'EOF'
 #!/usr/bin/env bash
+[[ ${1:-} == --version ]] && { printf 'llama-cli version b10446 (adb55e5)\n'; exit 0; }
 exit 137
 EOF
 chmod +x "$tmp/exit-137"
@@ -78,6 +80,7 @@ PY
 # A plausible banner must not satisfy device/context/offload evidence.
 cat >"$tmp/no-offload" <<'EOF'
 #!/usr/bin/env bash
+[[ ${1:-} == --version ]] && { printf 'llama-cli version b10446 (adb55e5)\n'; exit 0; }
 printf 'Vulkan banner only; device=AMD Radeon RX 6900 XT\nllama_context: n_ctx = 32768\nanswer\nstop reason: stop\n' >&2
 EOF
 chmod +x "$tmp/no-offload"
@@ -87,6 +90,7 @@ expect_reject no-offload "$RUNNER" --model "$model" --sha256 "$sha" \
 # Expected completion is an exact final stream, not a substring or extra text.
 cat >"$tmp/extra-completion" <<'EOF'
 #!/usr/bin/env bash
+[[ ${1:-} == --version ]] && { printf 'llama-cli version b10446 (adb55e5)\n'; exit 0; }
 printf 'load Vulkan0 device=AMD Radeon RX 6900 XT\nllama_context: n_ctx = 32768\noffloaded 20 layers\n' >&2
 printf 'answer with extra text'
 printf 'finish_reason=stop\n' >&2
@@ -98,6 +102,7 @@ expect_reject extra-completion "$RUNNER" --model "$model" --sha256 "$sha" \
 # Resource capture is mandatory and must include safe values plus system swap activity.
 cat >"$tmp/no-resources" <<'EOF'
 #!/usr/bin/env bash
+[[ ${1:-} == --version ]] && { printf 'llama-cli version b10446 (adb55e5)\n'; exit 0; }
 printf 'Vulkan0 device=AMD Radeon RX 6900 XT\nllama_context: n_ctx = 32768\noffloaded 20 layers\n' >&2
 printf 'answer'; printf 'stopped-by-EOS\n' >&2
 EOF
@@ -109,6 +114,7 @@ expect_reject no-resources "$RUNNER" --model "$model" --sha256 "$sha" \
 # credential URLs, and private-key bodies—not only /home and token key names.
 cat >"$tmp/secret-output" <<'EOF'
 #!/usr/bin/env bash
+[[ ${1:-} == --version ]] && { printf 'llama-cli version b10446 (adb55e5)\n'; exit 0; }
 printf 'Vulkan0 device=AMD Radeon RX 6900 XT\nllama_context: n_ctx = 32768\noffloaded 20 layers\n' >&2
 printf 'answer'; printf 'stopped-by-EOS\n/path/to/private/file bearer ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345 https://user:password@example.invalid/x\n-----BEGIN OPENSSH PRIVATE KEY-----\nsecret-body\n-----END OPENSSH PRIVATE KEY-----\n' >&2
 EOF
@@ -119,6 +125,7 @@ expect_reject secrets "$RUNNER" --model "$model" --sha256 "$sha" \
 # A child that inherits the capture FIFO must not leave the parent waiting forever.
 cat >"$tmp/orphan-writer" <<'EOF'
 #!/usr/bin/env bash
+[[ ${1:-} == --version ]] && { printf 'llama-cli version b10446 (adb55e5)\n'; exit 0; }
 (sleep 30) &
 exit 0
 EOF
@@ -129,6 +136,7 @@ expect_reject orphan-fifo timeout 5 "$RUNNER" --model "$model" --sha256 "$sha" \
 # A hung child must be terminated and represented as a timed-out lifecycle result.
 cat >"$tmp/hanging-llama-cli" <<'EOF'
 #!/usr/bin/env bash
+[[ ${1:-} == --version ]] && { printf 'llama-cli version b10446 (adb55e5)\n'; exit 0; }
 sleep 30
 EOF
 chmod +x "$tmp/hanging-llama-cli"

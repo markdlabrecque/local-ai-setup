@@ -49,7 +49,9 @@ printf 'LOCAL_AI_BASELINE_OK\nUNEXPECTED_RESPONSE\n'
 printf 'finish_reason=stop\n' >&2
 EOF
 chmod +x "$tmp/extra-line"
-if run "$tmp/extra.json" 2>/dev/null; then fail "exact completion plus extra line was accepted"; fi
+if BASELINE_MEASURE_FILE="$tmp/measure.json" "$RUNNER" --model "$model" --sha256 "$sha" --llama-cli "$tmp/extra-line" --expected-completion LOCAL_AI_BASELINE_OK --output "$tmp/extra.json" --timeout 5 2>/dev/null; then
+  fail "exact completion plus extra line was accepted"
+fi
 
 # Stream chunks must not be asserted as transport chunks unless read boundaries
 # and timestamps (or an equivalent honest provenance field) were captured.

@@ -38,13 +38,15 @@ awk -v timeout="$timeout_seconds" 'BEGIN {exit !(timeout > 0)}' || { printf 'tim
 [[ "$gpu_layers" =~ ^[0-9]+$ ]] || { printf 'invalid GPU layers\n' >&2; exit 2; }
 [[ "$max_stdout_bytes" =~ ^[0-9]+$ && "$max_stderr_bytes" =~ ^[0-9]+$ ]] || { printf 'invalid capture limit\n' >&2; exit 2; }
 command -v sha256sum >/dev/null 2>&1 || { printf 'sha256sum is required\n' >&2; exit 1; }
+[[ -x "$cli" ]] || { printf 'llama-cli is not executable\n' >&2; exit 1; }
+cli_version=$($cli --version 2>&1) || { printf 'cannot read llama-cli version\n' >&2; exit 1; }
+[[ "$cli_version" =~ adb55e5 ]] || { printf 'llama-cli commit mismatch: expected b10446/adb55e5\n' >&2; exit 1; }
 actual_sha=$(sha256sum -- "$model" | awk '{print $1}')
 if [[ "${actual_sha,,}" != "${expected_sha,,}" ]]; then printf 'model checksum mismatch\n' >&2; exit 1; fi
-[[ -x "$cli" ]] || { printf 'llama-cli is not executable\n' >&2; exit 1; }
 mkdir -p -- "$(dirname -- "$output")" || exit 1
 
 tmp=$(mktemp -d)
-runner_pid=''; stdout_cap_pid=''; stderr_cap_pid=''; monitor_pid=''; cleaned=false
+runner_pid=''; watchdog_pid=''; stdout_cap_pid=''; stderr_cap_pid=''; monitor_pid=''; cleaned=false
 terminate_runner_group() {
   [[ -n "$runner_pid" ]] || return 0
   # setsid gives the supervisor and every CLI descendant a private process group;
@@ -58,6 +60,7 @@ cleanup() {
   [[ "$cleaned" == true ]] && return
   cleaned=true
   [[ -n "$monitor_pid" ]] && kill "$monitor_pid" 2>/dev/null || true
+  [[ -n "$watchdog_pid" ]] && kill "$watchdog_pid" 2>/dev/null || true
   terminate_runner_group
   [[ -n "$stdout_cap_pid" ]] && kill "$stdout_cap_pid" 2>/dev/null || true
   [[ -n "$stderr_cap_pid" ]] && kill "$stderr_cap_pid" 2>/dev/null || true
@@ -75,26 +78,48 @@ mkfifo "$stdout_fifo" "$stderr_fifo"
 # wedged child from filling disk, while allowing it to exit normally.
 capper=$tmp/cap.py
 cat >"$capper" <<'PY'
-import sys
-source, destination, limit, marker = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4]
-written = 0
-with open(destination, 'wb') as out, open(source, 'rb') as inp:
+import json, os, sys, time
+source, destination, limit, marker, evidence = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4], sys.argv[5]
+written = 0; reads = []
+with open(destination, 'wb') as out, open(source, 'rb', buffering=0) as inp:
     while True:
-        chunk = inp.read(65536)
+        chunk = os.read(inp.fileno(), 65536)
         if not chunk: break
+        reads.append({'timestamp': time.time(), 'read_boundary': len(chunk)})
         if written < limit:
             piece = chunk[:limit - written]
             out.write(piece); written += len(piece)
 with open(marker, 'w') as state:
     state.write('true' if written >= limit else 'false')
+with open(evidence, 'w') as stream:
+    json.dump(reads, stream)
 PY
-python3 "$capper" "$stdout_fifo" "$stdout_file" "$max_stdout_bytes" "$tmp/stdout.truncated" & stdout_cap_pid=$!
-python3 "$capper" "$stderr_fifo" "$stderr_file" "$max_stderr_bytes" "$tmp/stderr.truncated" & stderr_cap_pid=$!
+python3 "$capper" "$stdout_fifo" "$stdout_file" "$max_stdout_bytes" "$tmp/stdout.truncated" "$tmp/stdout.evidence.json" & stdout_cap_pid=$!
+python3 "$capper" "$stderr_fifo" "$stderr_file" "$max_stderr_bytes" "$tmp/stderr.truncated" "$tmp/stderr.evidence.json" & stderr_cap_pid=$!
 
 # --simple-io keeps the stream machine-readable (no interactive banner or UI), while
 # --single-turn and --no-display-prompt make this a deterministic one-shot prompt.
 run_args=(--model "$model" --ctx-size 32768 --device Vulkan0 --gpu-layers "$gpu_layers" --flash-attn on --reasoning off --temp 0 --seed 42 --single-turn --simple-io --verbose --no-display-prompt --prompt "$prompt" --n-predict 128)
 measure_file=$tmp/measure.json
+sysfs_root=${BASELINE_SYSFS_ROOT:-/sys}
+target_vram_file=''; target_vram_card='unavailable'; target_vram_pci_id='unavailable'
+for card_device in "$sysfs_root"/class/drm/card*/device; do
+  [[ -d "$card_device" ]] || continue
+  card_name=$(basename "${card_device%/device}")
+  [[ "$card_name" =~ ^card[0-9]+$ ]] || continue
+  pci=$(awk -F= '$1=="PCI_ID" {print toupper($2); exit}' "$card_device/uevent" 2>/dev/null || true)
+  if [[ -z "$pci" ]]; then
+    vendor=$(tr -d '[:space:]' <"$card_device/vendor" 2>/dev/null || true)
+    device_id=$(tr -d '[:space:]' <"$card_device/device" 2>/dev/null || true)
+    pci="${vendor#0x}:${device_id#0x}"; pci=${pci^^}
+  fi
+  if [[ "$pci" == '1002:73BF' ]]; then
+    target_vram_file="$card_device/mem_info_vram_used"
+    target_vram_card=$(basename "${card_device%/device}")
+    target_vram_pci_id=$pci
+    break
+  fi
+done
 if [[ -n "${BASELINE_MEASURE_FILE:-}" && -r "${BASELINE_MEASURE_FILE}" ]]; then cp -- "${BASELINE_MEASURE_FILE}" "$measure_file"; else printf '{"ram_mib":null,"vram_mib":null,"swap_mib":null}\n' >"$measure_file"; fi
 if [[ -z "${BASELINE_MEASURE_FILE:-}" ]]; then
   monitor() {
@@ -129,7 +154,10 @@ if [[ -z "${BASELINE_MEASURE_FILE:-}" ]]; then
       [[ "$vm_in" =~ ^[0-9]+$ && "$swap_in0" =~ ^[0-9]+$ ]] && swap_in=$((vm_in - swap_in0))
       [[ "$vm_out" =~ ^[0-9]+$ && "$swap_out0" =~ ^[0-9]+$ ]] && swap_out=$((vm_out - swap_out0))
       vram=0
-      for card in /sys/class/drm/card*/device/mem_info_vram_used; do [[ -r "$card" ]] || continue; value=$(awk '{print $1; exit}' "$card"); [[ "$value" =~ ^[0-9]+$ ]] && ((value > vram)) && vram=$value; done
+      if [[ -n "$target_vram_file" && -r "$target_vram_file" ]]; then
+        value=$(awk '{print $1; exit}' "$target_vram_file")
+        [[ "$value" =~ ^[0-9]+$ ]] && vram=$value
+      fi
       ((vram > vram_peak)) && vram_peak=$vram
       ((samples++))
       printf '{"ram_mib":%s,"vram_mib":%s,"swap_mib":%s,"mem_available_mib":%s,"system_swap_used_mib":%s,"swap_in_pages":%s,"swap_out_pages":%s,"samples":%s}\n' "$((ram / 1024))" "$((vram_peak / 1024 / 1024))" "$((swap / 1024))" "$((available / 1024))" "$((system_swap_peak / 1024))" "$swap_in" "$swap_out" "$samples" >"$measure_file"
@@ -138,23 +166,31 @@ if [[ -z "${BASELINE_MEASURE_FILE:-}" ]]; then
   }
 fi
 set +e
-# Keep timeout's process group handling enabled so descendants (for example a
-# CLI wrapper which execs a worker) cannot retain the capture FIFOs after expiry.
-setsid --wait timeout --signal=TERM --kill-after=2s "$timeout_seconds" "$cli" "${run_args[@]}" >"$stdout_fifo" 2>"$stderr_fifo" & runner_pid=$!
+# Run the CLI in its own session and attribute deadlines with our own marker;
+# this distinguishes a natural child exit 124 from a watchdog timeout.
+setsid --wait "$cli" "${run_args[@]}" >"$stdout_fifo" 2>"$stderr_fifo" & runner_pid=$!
+(
+  sleep "$timeout_seconds"
+  if kill -0 "$runner_pid" 2>/dev/null; then
+    : >"$tmp/timed_out"
+    kill -TERM -- "-$runner_pid" 2>/dev/null || true
+    sleep 2
+    kill -KILL -- "-$runner_pid" 2>/dev/null || true
+  fi
+) & watchdog_pid=$!
 [[ -z "${BASELINE_MEASURE_FILE:-}" ]] && monitor "$runner_pid" & monitor_pid=$! || monitor_pid=''
 wait "$runner_pid"; status=$?
+[[ -n "$watchdog_pid" ]] && kill "$watchdog_pid" 2>/dev/null || true
+[[ -n "$watchdog_pid" ]] && wait "$watchdog_pid" 2>/dev/null || true
 # Reap/terminate any CLI child that inherited a FIFO before waiting for cappers.
 terminate_runner_group
 wait "$stdout_cap_pid" 2>/dev/null; wait "$stderr_cap_pid" 2>/dev/null
 [[ -n "$monitor_pid" ]] && kill "$monitor_pid" 2>/dev/null || true
 [[ -n "$monitor_pid" ]] && wait "$monitor_pid" 2>/dev/null || true
 set -e
-# A direct CLI exit 137 is a failure, not proof that the timeout fired. GNU
-# timeout's ordinary deadline status is 124; kill-after escalation is retained
-# as a non-zero lifecycle failure unless a deadline status was observed.
-[[ $status -eq 124 ]] && timed_out=true || timed_out=false
+[[ -f "$tmp/timed_out" ]] && timed_out=true || timed_out=false
 measurements=$(python3 -c 'import json,sys; print(json.dumps(json.load(open(sys.argv[1]))))' "$measure_file" 2>/dev/null || printf '{"ram_mib":null,"vram_mib":null,"swap_mib":null}')
-export model cli prompt expected_completion context timeout_seconds actual_sha expected_sha status timed_out output measurements stdout_file stderr_file gpu_layers max_stdout_bytes max_stderr_bytes
+export model cli cli_version prompt expected_completion context timeout_seconds actual_sha expected_sha status timed_out output measurements stdout_file stderr_file gpu_layers max_stdout_bytes max_stderr_bytes target_vram_card target_vram_pci_id BASELINE_SYSFS_ROOT="${BASELINE_SYSFS_ROOT:-}" STDOUT_EVIDENCE_FILE="$tmp/stdout.evidence.json"
 python3 - <<'PY'
 import json, os, pathlib, re
 
@@ -213,15 +249,22 @@ expected = os.environ.get('expected_completion', '')
 expected_clean = clean(expected)
 ansi = re.compile(r'\x1b\[[0-?]*[ -/]*[@-~]')
 raw_chunks = [clean(x.strip()) for x in stdout.splitlines() if x.strip()]
-standalone_expected = [clean(ansi.sub('', x).strip()) for x in stdout.splitlines()
-                       if clean(ansi.sub('', x).strip()) == expected_clean]
+stdout_lines = [clean(ansi.sub('', x).strip()) for x in stdout.splitlines()]
+expected_indexes = [i for i, line in enumerate(stdout_lines) if line == expected_clean]
+# After the exact response, only known terminal UI/timing lines are allowed.
+terminal_noise = re.compile(r'(?i)^(?:\[\s*Prompt:.*\]|Exiting\.\.\.|\s*)$')
+exact_terminal = bool(expected_indexes) and not any(
+    line and not terminal_noise.match(line) for line in stdout_lines[expected_indexes[-1] + 1:]
+)
 cleaned_final = clean(final_response)
-expected_match = (not expected_clean) or bool(standalone_expected) or (cleaned_final == expected_clean)
+expected_match = (not expected_clean and bool(cleaned_final)) or (bool(expected_clean) and exact_terminal)
 completion = expected_clean if expected_clean and expected_match else cleaned_final
-# chunks preserves the observed transport/UI lines; response_chunks identifies
-# only the exact assistant response used for validation.
-chunks = raw_chunks
-response_chunks = standalone_expected or [clean(x.strip()) for x in final_response.splitlines() if x.strip()]
+response_chunks = [expected_clean] if expected_clean and expected_match else [clean(x.strip()) for x in final_response.splitlines() if x.strip()]
+# Preserve observed FIFO read boundaries and timestamps instead of claiming
+# that post-processed output lines are transport chunks.
+try: chunk_evidence = json.loads(pathlib.Path(os.environ['STDOUT_EVIDENCE_FILE']).read_text())
+except Exception: chunk_evidence = []
+chunks = response_chunks
 offload_log_evidence = bool(re.search(r'(?i)(offload|offloaded|layers?.*(?:vulkan|gpu)|(?:vulkan|gpu).*layers?)', combined))
 metadata = [clean(x.strip()) for x in combined.splitlines() if re.search(r'(?i)(llama_model_loader|^llama_vocab|^general\.|^tokenizer\.)', x)]
 try: measurements = json.loads(os.environ['measurements'])
@@ -243,27 +286,16 @@ if vram_device != 'unavailable' and not vram_device.lower().startswith('amd '):
     vram_device = 'AMD ' + vram_device
 # Associate VRAM accounting with the discrete adapter by PCI identity, not a
 # marketing string. The iGPU is card0 (1002:13C0); the target is card1 (1002:73BF).
-vram_card = 'unavailable'; vram_pci_id = 'unavailable'
-for card_path in pathlib.Path('/sys/class/drm').glob('card*/device'):
-    try:
-        uevent = (card_path / 'uevent').read_text(errors='replace')
-        pci = re.search(r'(?im)^PCI_ID=(1002:[0-9A-F]{4})$', uevent)
-        if not pci:
-            vendor = (card_path / 'vendor').read_text().strip().replace('0x', '')
-            device_id = (card_path / 'device').read_text().strip().replace('0x', '')
-            pci = re.match(r'(1002:[0-9A-F]{4})$', vendor + ':' + device_id)
-        if pci and pci.group(1).lower() == '1002:73bf':
-            vram_card = card_path.parent.name
-            vram_pci_id = pci.group(1).upper()
-            break
-    except OSError:
-        pass
+vram_card = os.environ.get('target_vram_card', 'unavailable')
+vram_pci_id = os.environ.get('target_vram_pci_id', 'unavailable')
+# Fixtures may provide an injectable sysfs root and still use a measurement
+# file; the shell collector resolves the same PCI identity in both modes.
 # The verbose Vulkan inventory names the adapter while sysfs supplies the
 # unambiguous PCI association used for its VRAM counter.
 if device != 'unavailable' and vram_pci_id == '1002:73BF':
     vram_device = 'AMD Radeon RX 6900 XT'
 cmd = ['llama-cli', '--model', pathlib.Path(os.environ['model']).name, '--ctx-size', '32768', '--device', 'Vulkan0', '--gpu-layers', os.environ['gpu_layers'], '--flash-attn', 'on', '--reasoning', 'off', '--temp', '0', '--seed', '42', '--single-turn', '--simple-io', '--verbose', '--no-display-prompt', '--prompt', clean(os.environ['prompt']), '--n-predict', '128']
-result = {'schema_version': 1, 'model': pathlib.Path(os.environ['model']).name, 'model_sha256': os.environ['actual_sha'], 'command': cmd, 'device': device, 'context_tokens': 32768, 'context_confirmed': confirmed_context, 'gpu_layers': int(os.environ['gpu_layers']), 'offload_evidence': offload_evidence, 'reasoning_mode': 'off', 'expected_completion': expected_clean, 'expected_completion_match': expected_match, 'final_section_confirmed': bool(completion) and expected_match, 'stream': {'completion': completion, 'chunks': chunks, 'response_chunks': response_chunks, 'thinking': thinking, 'prompt': clean(prompt_text), 'enabled': bool(response_chunks)}, 'stop_reason': stop, 'stop_event': stop_event, 'timing_evidence': timing_evidence, 'vram_device': vram_device, 'vram_card': vram_card, 'vram_pci_id': vram_pci_id, 'measurement_source': measurement_source, 'swap_activity': {'peak_mib': swap_peak, 'system_used_peak_mib': system_swap_peak, 'pages_in': swap_in_pages, 'pages_out': swap_out_pages}, 'exit_code': int(os.environ['status']), 'timed_out': os.environ['timed_out'] == 'true', 'measurements': measurements, 'model_metadata': metadata, 'startup_log': clean(stderr), 'capture_limits': {'stdout_bytes': int(os.environ['max_stdout_bytes']), 'stderr_bytes': int(os.environ['max_stderr_bytes'])}}
+result = {'schema_version': 1, 'model': pathlib.Path(os.environ['model']).name, 'model_sha256': os.environ['actual_sha'], 'llama_cpp': {'release': 'b10446', 'commit': 'adb55e5', 'version_output': clean(os.environ['cli_version'])}, 'command': cmd, 'device': device, 'context_tokens': 32768, 'context_confirmed': confirmed_context, 'gpu_layers': int(os.environ['gpu_layers']), 'offload_evidence': offload_evidence, 'reasoning_mode': 'off', 'expected_completion': expected_clean, 'expected_completion_match': expected_match, 'final_section_confirmed': bool(completion) and expected_match, 'stream': {'completion': completion, 'chunks': chunks, 'response_chunks': response_chunks, 'chunk_evidence': chunk_evidence, 'capture_mode': 'fifo-read-boundaries', 'thinking': thinking, 'prompt': clean(prompt_text), 'enabled': bool(response_chunks and chunk_evidence)}, 'stop_reason': stop, 'stop_event': stop_event, 'timing_evidence': timing_evidence, 'vram_device': vram_device, 'vram_card': vram_card, 'vram_pci_id': vram_pci_id, 'measurement_source': measurement_source, 'swap_activity': {'peak_mib': swap_peak, 'system_used_peak_mib': system_swap_peak, 'pages_in': swap_in_pages, 'pages_out': swap_out_pages}, 'exit_code': int(os.environ['status']), 'timed_out': os.environ['timed_out'] == 'true', 'measurements': measurements, 'model_metadata': metadata, 'startup_log': clean(stderr), 'capture_limits': {'stdout_bytes': int(os.environ['max_stdout_bytes']), 'stderr_bytes': int(os.environ['max_stderr_bytes'])}}
 pathlib.Path(os.environ['output']).write_text(json.dumps(result, indent=2, sort_keys=True) + '\n')
 PY
 if [[ "$timed_out" == true || $status -ne 0 ]]; then exit 1; fi
