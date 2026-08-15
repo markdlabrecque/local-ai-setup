@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "manifest_purpose": "Pinned Qwen3.5-27B GGUF artifacts; checksums are the Hugging Face LFS SHA-256 object IDs.",
+  "official_source_baseline": {
+    "repository": "Qwen/Qwen3.5-27B",
+    "revision": "fc05daec18b0a78c049392ed2e771dde82bdf654",
+    "index_file": "model.safetensors.index.json",
+    "index_total_size_bytes": 55562872800,
+    "index_url": "https://huggingface.co/Qwen/Qwen3.5-27B/raw/fc05daec18b0a78c049392ed2e771dde82bdf654/model.safetensors.index.json"
+  },
+  "artifacts": [
+    {
+      "id": "qwen3.5-27b-q8_0",
+      "quantization": "Q8_0",
+      "model_identity": "Qwen/Qwen3.5-27B",
+      "source_model": "Qwen/Qwen3.5-27B",
+      "repository": "unsloth/Qwen3.5-27B-GGUF",
+      "revision": "3221f178a6b842d04f1fb42f1c413534adcc0a6a",
+      "filename": "Qwen3.5-27B-Q8_0.gguf",
+      "size_bytes": 28595763104,
+      "sha256": "6b0a101b0a86697fe11eabcc1a7db72699a9f3d4b18b6a1ac75ea3fb2c26c450",
+      "download_url": "https://huggingface.co/unsloth/Qwen3.5-27B-GGUF/resolve/3221f178a6b842d04f1fb42f1c413534adcc0a6/Qwen3.5-27B-Q8_0.gguf",
+      "lineage": {
+        "converter_declared_base_model": "Qwen/Qwen3.5-27B",
+        "basis": "converter repository metadata; conversion source commit not independently claimed",
+        "constraints": "not MoE, distilled, or modified"
+      },
+      "source_provenance": {
+        "repository": "Qwen/Qwen3.5-27B",
+        "revision": "fc05daec18b0a78c049392ed2e771dde82bdf654",
+        "index_file": "model.safetensors.index.json",
+        "basis": "independently pinned official source revision; not a claim about the converter's source commit"
+      }
+    },
+    {
+      "id": "qwen3.5-27b-q6_k",
+      "quantization": "Q6_K",
+      "model_identity": "Qwen/Qwen3.5-27B",
+      "source_model": "Qwen/Qwen3.5-27B",
+      "repository": "unsloth/Qwen3.5-27B-GGUF",
+      "revision": "3221f178a6b842d04f1fb42f1c413534adcc0a6a",
+      "filename": "Qwen3.5-27B-Q6_K.gguf",
+      "size_bytes": 22453933984,
+      "sha256": "69e0f8527e0d937097cbcd486b51e2effaed963f49ef7962c9ef3eab45164ff8",
+      "download_url": "https://huggingface.co/unsloth/Qwen3.5-27B-GGUF/resolve/3221f178a6b842d04f1fb42f1c413534adcc0a6/Qwen3.5-27B-Q6_K.gguf",
+      "lineage": {
+        "converter_declared_base_model": "Qwen/Qwen3.5-27B",
+        "basis": "converter repository metadata; conversion source commit not independently claimed",
+        "constraints": "not MoE, distilled, or modified"
+      },
+      "source_provenance": {
+        "repository": "Qwen/Qwen3.5-27B",
+        "revision": "fc05daec18b0a78c049392ed2e771dde82bdf654",
+        "index_file": "model.safetensors.index.json",
+        "basis": "independently pinned official source revision; not a claim about the converter's source commit"
+      }
+    }
+  ]
+}
