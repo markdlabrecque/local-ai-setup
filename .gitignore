@@ -1,0 +1,10 @@
+# Local build, model, benchmark, and secret artifacts
+.env
+*.log
+*.gguf
+models/
+results/
+
+# Optional project-local caches
+.cache/
+build/
