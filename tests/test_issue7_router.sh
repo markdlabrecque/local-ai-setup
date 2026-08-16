@@ -62,10 +62,32 @@ cleanup() {
 trap cleanup EXIT
 mkdir -p "$tmp/bin" "$tmp/models" "$tmp/runtime"
 
+# Keep manifest-named fixtures in place before launch so generated preset
+# sections and discovered router models describe the same artifacts.
+python3 - "$ROOT/config/models.json" "$tmp/models" <<'PY'
+import json, pathlib, sys
+m = json.load(open(sys.argv[1]))
+for a in m["artifacts"]:
+    pathlib.Path(sys.argv[2], a["filename"]).write_text("bounded fixture for " + a["id"])
+PY
+q8=$(python3 - "$ROOT/config/models.json" <<'PY'
+import json, sys
+m=json.load(open(sys.argv[1])); print(next(a["filename"] for a in m["artifacts"] if a["quantization"] == "Q8_0"))
+PY
+)
+q6=$(python3 - "$ROOT/config/models.json" <<'PY'
+import json, sys
+m=json.load(open(sys.argv[1])); print(next(a["filename"] for a in m["artifacts"] if a["quantization"] == "Q6_K"))
+PY
+)
+q8_id=${q8%.gguf}
+q6_id=${q6%.gguf}
+
 cat >"$tmp/fake-llama-server" <<'EOF'
 #!/usr/bin/env python3
 import json, os, sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 
 args = sys.argv[1:]
 log = pathlib = os.environ["FAKE_SERVER_ARGS"]
@@ -92,15 +114,31 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/health": self.send(200, {"status": "ok"})
         elif self.path == "/models":
-            self.send(200, {"data": [] if state["loaded"] is None else [{"id": state["loaded"]}]})
+            models_dir = Path(args[args.index("--models-dir") + 1])
+            # b10446 exposes discovered models by extensionless ID and reports
+            # readiness through each row's status.
+            rows = []
+            for path in sorted(Path(models_dir).glob("*.gguf")):
+                if path.is_file():
+                    rows.append({"id": path.stem,
+                                 "status": "loaded" if state["loaded"] == path.stem else "unloaded"})
+            self.send(200, {"object": "list", "data": rows})
         else: self.send(404, {})
     def do_POST(self):
         length = int(self.headers.get("Content-Length", "0"))
         body = json.loads(self.rfile.read(length) or b"{}")
-        if self.path in ("/models/load", "/models/unload"):
-            state["loaded"] = body.get("model") if self.path.endswith("load") else None
-            self.send(200, {"loaded": state["loaded"]})
-        else: self.send(404, {})
+        if self.path not in ("/models/load", "/models/unload"):
+            self.send(404, {})
+            return
+        model = body.get("model")
+        models_dir = Path(args[args.index("--models-dir") + 1])
+        discovered = {path.stem for path in models_dir.glob("*.gguf")
+                      if path.is_file()}
+        if model not in discovered:
+            self.send(400, {"success": False})
+            return
+        state["loaded"] = model if self.path == "/models/load" else None
+        self.send(200, {"success": True})
 
 HTTPServer(("127.0.0.1", 8080), Handler).serve_forever()
 EOF
@@ -142,12 +180,15 @@ for _ in $(seq 1 100); do
 done
 [[ -s "$tmp/health.json" ]] || fail "bounded router never served /health"
 PATH="$tmp/bin:$PATH" curl -fsS http://127.0.0.1:8080/models >"$tmp/initial-models.json"
-python3 - "$tmp/server-args.json" "$tmp/health.json" "$tmp/initial-models.json" "$tmp/models" <<'PY' || exit 1
-import json, sys
+python3 - "$tmp/server-args.json" "$tmp/health.json" "$tmp/initial-models.json" "$tmp/models" "$ROOT/config/models.json" <<'PY' || exit 1
+import json, pathlib, sys
 args = json.load(open(sys.argv[1]))
 health = json.load(open(sys.argv[2])); models = json.load(open(sys.argv[3]))
+manifest = json.load(open(sys.argv[5]))
+expected = [{"id": pathlib.Path(a["filename"]).stem, "status": "unloaded"}
+            for a in manifest["artifacts"]]
 assert health["status"] == "ok"
-assert models["data"] == [], models
+assert models["data"] == sorted(expected, key=lambda row: row["id"]), models
 assert args.count("--host") == 1 and args[args.index("--host") + 1] == "127.0.0.1"
 assert args.count("--port") == 1 and args[args.index("--port") + 1] == "8080"
 assert "-m" not in args and "--model" not in args
@@ -156,32 +197,26 @@ for flag in ("--models-dir", "--models-preset", "--no-models-autoload", "--jinja
 assert args[args.index("--models-dir") + 1] == sys.argv[4]
 PY
 
-# Use the manifest's exact filenames.  A checksum mismatch must fail before a
-# POST reaches the server; the bounded hash shim then permits both fixtures so
-# this test remains small and never downloads a model.
-python3 - "$ROOT/config/models.json" "$tmp/models" <<'PY'
-import json, pathlib, sys
-m = json.load(open(sys.argv[1]))
-for a in m["artifacts"]:
-    pathlib.Path(sys.argv[2], a["filename"]).write_text("bounded fixture for " + a["id"])
-PY
-q8=$(python3 - "$ROOT/config/models.json" <<'PY'
+assert_status() {
+  local expected_id=$1 expected_status=$2
+  PATH="$tmp/bin:$PATH" curl -fsS http://127.0.0.1:8080/models >"$tmp/models-check.json"
+  python3 - "$tmp/models-check.json" "$expected_id" "$expected_status" <<'PY'
 import json, sys
-m=json.load(open(sys.argv[1])); print(next(a["filename"] for a in m["artifacts"] if a["quantization"] == "Q8_0"))
+rows = json.load(open(sys.argv[1]))["data"]
+row = next(row for row in rows if row["id"] == sys.argv[2])
+assert set(row) == {"id", "status"}
+assert row["status"] == sys.argv[3], row
 PY
-)
-q6=$(python3 - "$ROOT/config/models.json" <<'PY'
-import json, sys
-m=json.load(open(sys.argv[1])); print(next(a["filename"] for a in m["artifacts"] if a["quantization"] == "Q6_K"))
-PY
-)
-# A normal checksum check must reject the tiny fixture and leave /models empty.
+}
+
+# A normal checksum check must reject the tiny fixture and leave every
+# discovered model unloaded; it must not reach POST.
 if PATH="$tmp/bin:$PATH" "$MODEL_HELPER" load --model-id qwen3.5-27b-q8_0 \
     --models-dir "$tmp/models" --manifest "$ROOT/config/models.json" \
     --base-url http://127.0.0.1:8080; then
   fail "checksum-mismatched model was loaded"
 fi
-[[ "$(PATH="$tmp/bin:$PATH" curl -fsS http://127.0.0.1:8080/models)" == *'"data": []'* ]] || fail "checksum preflight reached model load"
+assert_status "$q8_id" unloaded || fail "checksum preflight reached model load"
 
 cat >"$tmp/bin/sha256sum" <<EOF
 #!/usr/bin/env bash
@@ -196,21 +231,22 @@ chmod +x "$tmp/bin/sha256sum"
 PATH="$tmp/bin:$PATH" "$MODEL_HELPER" load --model-id qwen3.5-27b-q8_0 \
   --models-dir "$tmp/models" --manifest "$ROOT/config/models.json" \
   --base-url http://127.0.0.1:8080
-[[ "$(PATH="$tmp/bin:$PATH" curl -fsS http://127.0.0.1:8080/models)" == *"$q8"* ]] || fail "Q8 preset did not load"
+assert_status "$q8_id" loaded || fail "Q8 preset did not load"
 PATH="$tmp/bin:$PATH" "$MODEL_HELPER" unload --model-id qwen3.5-27b-q8_0 \
   --models-dir "$tmp/models" --manifest "$ROOT/config/models.json" \
   --base-url http://127.0.0.1:8080
-[[ "$(PATH="$tmp/bin:$PATH" curl -fsS http://127.0.0.1:8080/models)" == *'"data": []'* ]] || fail "unload did not clear runtime model"
+assert_status "$q8_id" unloaded || fail "unload did not clear runtime model"
 
 # Q6 is selected by adding the manifest-named file, not by editing launcher or
 # helper code.  The same helper invocation must select its manifest preset.
 PATH="$tmp/bin:$PATH" "$MODEL_HELPER" load --model-id qwen3.5-27b-q6_k \
   --models-dir "$tmp/models" --manifest "$ROOT/config/models.json" \
   --base-url http://127.0.0.1:8080
-[[ "$(PATH="$tmp/bin:$PATH" curl -fsS http://127.0.0.1:8080/models)" == *"$q6"* ]] || fail "Q6 manifest-named fixture was not selectable"
+assert_status "$q6_id" loaded || fail "Q6 manifest-named fixture was not selectable"
 PATH="$tmp/bin:$PATH" "$MODEL_HELPER" unload --model-id qwen3.5-27b-q6_k \
   --models-dir "$tmp/models" --manifest "$ROOT/config/models.json" \
   --base-url http://127.0.0.1:8080
+assert_status "$q6_id" unloaded || fail "Q6 unload did not report extensionless model as unloaded"
 [[ -f "$tmp/models/$q8" && -f "$tmp/models/$q6" ]] || fail "model lifecycle deleted a model artifact"
 
 # Real smoke is opt-in and must not be confused with this fake integration.

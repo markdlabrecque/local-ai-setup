@@ -88,7 +88,7 @@ class B10446Endpoint:
                 if json.dumps(body) not in accepted:
                     self.reply({"success": False}, 400)
                     return
-                owner.state = "loading" if self.path.endswith("load") else "unloading"
+                owner.state = "loading" if self.path == "/models/load" else "unloading"
                 owner.load_polls = owner.unload_polls = 0
                 if owner.mode == "wrong-success":
                     self.reply({"success": 1})
