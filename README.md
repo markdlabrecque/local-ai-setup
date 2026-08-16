@@ -95,6 +95,13 @@ bounded sanitized artifacts, and the report contract in
 [`schemas/evaluation-report.schema.json`](schemas/evaluation-report.schema.json).
 See [`docs/issue-11-evaluation.md`](docs/issue-11-evaluation.md).
 
+## Final deployment verification
+
+From a documented clean deployment, run
+`scripts/verify-deployment.py --real --timeout 1200`. The sanitized live result
+and check list are in
+[`docs/issue-16-deployment-verification.md`](docs/issue-16-deployment-verification.md).
+
 ## Operator guide
 
 The ordered new-machine, operations, upgrade/rollback, benchmark, and
