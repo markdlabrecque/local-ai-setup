@@ -64,7 +64,7 @@ scripts/router-model.sh load --model-id qwen3.5-27b-q8_0
 scripts/router-smoke.sh --real
 ```
 
-The launcher binds only to `127.0.0.1:8080`, passes `--no-models-autoload`, and cleans its complete server process group. It never deletes model files. The portable test uses a fake server; do not start the real 28 GB model for that gate.
+The launcher binds only to `127.0.0.1:8080`, passes `--no-models-autoload`, isolates router configuration, and cleans its complete server process group with a finite TERM/KILL grace period. It generates private presets only for present GGUF artifacts and never deletes model files. The lifecycle helper shares the downloader lock, verifies identity before and after asynchronous load/unload, sends extensionless b10446 IDs, and requires the exact success response. The portable test uses a fake server; do not start the real 28 GB model for that gate.
 
 ## Issue #11 evaluation
 

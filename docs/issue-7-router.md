@@ -21,7 +21,10 @@ server process group.
 
 `config/router-presets.json` is the reviewed portable contract. llama.cpp
 b10446 consumes INI presets, so the launcher validates this JSON and generates
-a disposable INI in the runtime directory. Both Q8_0 and Q6_K have explicit
+a unique mode-700-runtime/mode-600-file INI. Only non-empty, readable GGUF
+files currently present in the models directory receive a section; placing the
+manifest-named Q6_K artifact therefore makes Q6 appear without editing config.
+The HTTP IDs are extensionless GGUF stems. Both Q8_0 and Q6_K have explicit
 32,768 context, `Vulkan0`, 20 GPU layers, flash attention, 256/128 batch and
 micro-batch, and q8_0 K/V cache settings. `load-on-startup = false` is emitted
 for every section and `--no-models-autoload` is always passed on the command
@@ -41,10 +44,13 @@ scripts/router-model.sh unload --model-id qwen3.5-27b-q8_0 \
   --models-dir "$LOCAL_AI_MODEL_DIR"
 ```
 
-`router-model.sh load` verifies the exact manifest filename and SHA-256 before
-making a POST to `/models/load`; a mismatch never reaches the server.
-`unload` only requests runtime unloading. Neither operation removes a GGUF.
-The helper accepts only plain HTTP to `127.0.0.1`.
+`router-model.sh` takes the downloader's shared `.filename.lock` before
+verifying the exact manifest filename, SHA-256, and stat identity. It sends the
+extensionless ID, requires exactly `{"success": true}`, polls `/models` until
+it observes `loaded` or `unloaded`, and re-verifies identity before releasing
+the lock. A timeout or identity change fails; neither operation removes a GGUF.
+The helper accepts only plain HTTP to `127.0.0.1` and validates finite positive
+polling timeouts.
 
 ## Optional real smoke
 
