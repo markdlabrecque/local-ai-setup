@@ -1,0 +1,42 @@
+[Unit]
+Description=Local AI llama.cpp router (Issue #7 launcher)
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+EnvironmentFile=-%E/local-ai/router.env
+ExecStart=%h/.local/bin/run-router.sh --foreground
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+KillMode=control-group
+
+# The Q8_0 baseline needs the measured host headroom; retain a finite cgroup
+# ceiling so a failed load cannot consume the whole desktop indefinitely.
+MemoryAccounting=yes
+MemoryHigh=51539607552
+MemoryMax=60129542144
+MemorySwapMax=8589934592
+OOMPolicy=stop
+
+# Keep the service local and reduce ambient privilege without preventing the
+# launcher from creating its private runtime and cache directories.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+UMask=0077
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

@@ -66,6 +66,18 @@ scripts/router-smoke.sh --real
 
 The launcher binds only to `127.0.0.1:8080`, passes `--no-models-autoload`, isolates router configuration, and cleans its complete server process group with a finite TERM/KILL grace period. It generates private presets only for present GGUF artifacts and never deletes model files. The lifecycle helper shares the downloader lock, verifies identity before and after asynchronous load/unload, sends extensionless b10446 IDs, and requires the exact success response. The portable test uses a fake server; do not start the real 28 GB model for that gate.
 
+## User service (Issue #8)
+
+Install the hardened user-level service around the Issue #7 launcher without touching model data:
+
+```bash
+scripts/install-router-service.sh --enable --start
+systemctl --user status local-ai-router.service
+journalctl --user -u local-ai-router.service -f
+```
+
+The service uses portable `%h`/`%E` systemd specifiers, a quoted allowlisted environment file, localhost-only launcher policy, control-group cleanup, bounded `on-failure` restarts, and finite Q8_0-appropriate memory ceilings. Installation records exact owned artifacts in a manifest and refuses unowned or symlinked paths; the launcher override must be an absolute normalized path. It does not autoload or delete models. Stop or restart with `systemctl --user stop local-ai-router.service` or `systemctl --user restart local-ai-router.service`; remove only the service files with `scripts/uninstall-router-service.sh`. See [`docs/issue-8-systemd.md`](docs/issue-8-systemd.md).
+
 ## Issue #11 evaluation
 
 Run the portable evaluation gate with the deterministic OpenAI-compatible
