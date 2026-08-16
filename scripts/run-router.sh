@@ -117,24 +117,44 @@ except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
     print(f"error: invalid router presets: {exc}", file=sys.stderr); raise SystemExit(1)
 PY
 
-# Do not let inherited llama.cpp arguments or user configuration select a model.
+# b10446 always reads the system config and offers no disable flag. Refuse a
+# nonempty file so an administrator-level default cannot silently select a
+# model. The override exists only for bounded tests and is rejected otherwise.
+SYSTEM_CONFIG=/etc/llama.cpp/config.ini
+if [[ -n ${LOCAL_AI_TEST_SYSTEM_CONFIG_PATH:-} ]]; then
+  [[ ${LOCAL_AI_TEST_MODE:-0} == 1 ]] || die "system-config override is test-only"
+  SYSTEM_CONFIG=$LOCAL_AI_TEST_SYSTEM_CONFIG_PATH
+fi
+if [[ -s "$SYSTEM_CONFIG" ]]; then
+  die "nonempty llama.cpp system config is unsupported: $SYSTEM_CONFIG"
+fi
+
+# Do not let inherited llama.cpp arguments, Hugging Face caches, or user
+# configuration add models outside the explicit models directory.
 for name in ${!LLAMA_ARG_@}; do unset "$name"; done
+for name in ${!HF_@}; do unset "$name"; done
+unset HUGGINGFACE_HUB_CACHE TRANSFORMERS_CACHE
 HOME="$RUNTIME_DIR/home"
 XDG_CONFIG_HOME="$RUNTIME_DIR/xdg"
-export HOME XDG_CONFIG_HOME
-mkdir -p -- "$HOME" "$XDG_CONFIG_HOME"
-chmod 700 -- "$HOME" "$XDG_CONFIG_HOME"
+XDG_CACHE_HOME="$RUNTIME_DIR/xdg-cache"
+LLAMA_CACHE="$RUNTIME_DIR/llama-cache"
+export HOME XDG_CONFIG_HOME XDG_CACHE_HOME LLAMA_CACHE
+mkdir -p -- "$HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$LLAMA_CACHE"
+chmod 700 -- "$HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$LLAMA_CACHE"
 
 command -v setsid >/dev/null 2>&1 || die "setsid is required for process-group cleanup"
 server_pid=''
 stop_server() {
   [[ -n "$server_pid" ]] || return 0
-  kill -0 "$server_pid" 2>/dev/null || { wait "$server_pid" 2>/dev/null || true; return 0; }
-  kill -TERM -- "-$server_pid" 2>/dev/null || kill -TERM "$server_pid" 2>/dev/null || true
-  local deadline=$((SECONDS + 1))
-  while kill -0 "$server_pid" 2>/dev/null && ((SECONDS < deadline)); do sleep 0.05; done
-  if kill -0 "$server_pid" 2>/dev/null; then
-    kill -KILL -- "-$server_pid" 2>/dev/null || kill -KILL "$server_pid" 2>/dev/null || true
+  # Address the process group even when its setsid leader has already exited;
+  # child workers can otherwise survive a failed startup.
+  if kill -0 -- "-$server_pid" 2>/dev/null; then
+    kill -TERM -- "-$server_pid" 2>/dev/null || true
+    local deadline=$((SECONDS + 1))
+    while kill -0 -- "-$server_pid" 2>/dev/null && ((SECONDS < deadline)); do sleep 0.05; done
+    if kill -0 -- "-$server_pid" 2>/dev/null; then
+      kill -KILL -- "-$server_pid" 2>/dev/null || true
+    fi
   fi
   wait "$server_pid" 2>/dev/null || true
 }

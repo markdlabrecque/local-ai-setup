@@ -17,7 +17,11 @@ The model and runtime paths are optional and are derived from `LOCAL_AI_MODEL_DI
 `LOCAL_AI_RUNTIME_DIR`, `LOCAL_AI_SERVER`, `LOCAL_AI_BIN_DIR`, and XDG defaults.
 For a disposable or test server, pass `--server PATH`. Startup is bounded by
 the config timeout and waits for `/health`; termination kills the complete
-server process group.
+server process group, including descendants left after an early leader exit.
+The launcher clears inherited llama.cpp/Hugging Face cache variables, uses
+private empty runtime caches and user configuration directories, and fails
+closed if `/etc/llama.cpp/config.ini` is nonempty because b10446 provides no
+switch to disable that system-level file.
 
 `config/router-presets.json` is the reviewed portable contract. llama.cpp
 b10446 consumes INI presets, so the launcher validates this JSON and generates
