@@ -95,6 +95,11 @@ bounded sanitized artifacts, and the report contract in
 [`schemas/evaluation-report.schema.json`](schemas/evaluation-report.schema.json).
 See [`docs/issue-11-evaluation.md`](docs/issue-11-evaluation.md).
 
+## Operator guide
+
+The ordered new-machine, operations, upgrade/rollback, benchmark, and
+troubleshooting path is in [`docs/operator-guide.md`](docs/operator-guide.md).
+
 ## Issue #14 endurance and recovery
 
 The 13-minute real workload covered repeated Pi tools/reconnects, near-32K
