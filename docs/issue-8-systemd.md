@@ -17,20 +17,28 @@ scripts/install-router-service.sh --enable --start
 ```
 
 The installer writes `~/.config/systemd/user/local-ai-router.service`, a
-quoted `~/.config/local-ai/router.env`, and a small managed
-`~/.local/bin/run-router.sh` wrapper that invokes the tracked Issue #7
-launcher. Existing files, symlink targets, model files, and runtime files are
-never overwritten or followed. Paths can be overridden before installation
-with `LOCAL_AI_SERVER`, `LOCAL_AI_MODEL_DIR`, `LOCAL_AI_CONFIG_DIR`,
-`LOCAL_AI_RUNTIME_DIR`, and `LOCAL_AI_RUN_ROUTER`. Values are written to an
-allowlisted, systemd-escaped environment file; shell expansion is not used.
+quoted `~/.config/local-ai/router.env`, a small managed
+`~/.local/bin/run-router.sh` wrapper, and the ownership manifest
+`~/.config/local-ai/router.manifest`. Existing files are unowned unless the
+complete manifest still matches their recorded SHA-256 hashes; such files are
+refused rather than overwritten. Symlink targets and symlinked parent
+components are refused, and writes use temporary files plus no-follow
+directory descriptors where available. Model files and runtime files are
+never followed, overwritten, or removed. Paths can be overridden before
+installation with `LOCAL_AI_SERVER`, `LOCAL_AI_MODEL_DIR`,
+`LOCAL_AI_CONFIG_DIR`, `LOCAL_AI_RUNTIME_DIR`, and `LOCAL_AI_RUN_ROUTER`.
+`LOCAL_AI_RUN_ROUTER` must be an absolute, already-normalized executable path.
+Values are written to an allowlisted, systemd-escaped environment file; shell
+expansion is not used.
 
 The service is localhost-only through the Issue #7 launcher, uses a private
 `PrivateTmp`, `NoNewPrivileges`, a control-group kill mode, a 30-second stop
 timeout, and bounded `on-failure` restarts (five starts in five minutes).
-`MemoryHigh=64GiB`, `MemoryMax=68GiB`, and `MemorySwapMax=121GiB` retain the
-measured Q8_0 baseline headroom while putting a finite ceiling on a failed
-load. No model is autoloaded by the unit.
+`MemoryHigh=68719476736`, `MemoryMax=73014444032`, and
+`MemorySwapMax=103079215104` are finite byte values (64, 68, and 96 GiB),
+using systemd's unambiguous byte grammar. They retain the measured Q8_0
+baseline headroom and keep swap materially below the host total while putting
+a finite ceiling on a failed load. No model is autoloaded by the unit.
 
 ## Operate
 
@@ -56,11 +64,14 @@ compiled runtime, or other user data:
 scripts/uninstall-router-service.sh
 ```
 
-Uninstall is idempotent and refuses symlink targets. It tolerates an absent or
-already stopped user service, and always performs a bounded user-manager
-operation. Use `journalctl --user -u local-ai-router.service` to diagnose a
-failed startup; model loading remains an explicit `router-model.sh load`
-operation.
+Uninstall validates the manifest, markers, exact paths, and hashes before
+stopping or disabling anything. It is idempotent once all owned artifacts are
+gone, refuses unowned or symlinked artifacts, and removes only the unit,
+environment file, wrapper, and manifest. It never removes model, config,
+runtime, or compiled-binary data. It tolerates an absent or already stopped
+user service and bounds all user-manager calls. Use `journalctl --user -u
+local-ai-router.service` to diagnose a failed startup; model loading remains an
+explicit `router-model.sh load` operation.
 
 ## Portable/fake verification
 

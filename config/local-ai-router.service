@@ -17,9 +17,9 @@ KillMode=control-group
 # The Q8_0 baseline needs the measured host headroom; retain a finite cgroup
 # ceiling so a failed load cannot consume the whole desktop indefinitely.
 MemoryAccounting=yes
-MemoryHigh=64GiB
-MemoryMax=68GiB
-MemorySwapMax=121GiB
+MemoryHigh=68719476736
+MemoryMax=73014444032
+MemorySwapMax=103079215104
 OOMPolicy=stop
 
 # Keep the service local and reduce ambient privilege without preventing the
