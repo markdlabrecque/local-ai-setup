@@ -46,12 +46,25 @@
     },
     "provenance": {
       "type": "object",
-      "required": ["request_id", "transcript", "sanitized"],
+      "required": ["request_id", "transcript", "sanitized", "hashes"],
       "properties": {
         "request_id": {"type": "string", "minLength": 1},
         "transcript": {"type": "array", "maxItems": 64},
         "sanitized": {"const": true},
-        "deterministic_requests": {"type": "boolean"}
+        "deterministic_requests": {"type": "boolean"},
+        "hashes": {
+          "type": "object",
+          "required": ["inputs", "schema", "runner", "workspace", "request", "response"],
+          "properties": {
+            "inputs": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "schema": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "runner": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "workspace": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "request": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "response": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": true
     },

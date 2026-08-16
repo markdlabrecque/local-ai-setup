@@ -45,19 +45,23 @@ class Handler(BaseHTTPRequestHandler):
             message = {"role": "assistant", "tool_calls": [{"id": "bad", "type": "function"}]}
         elif "parallel" in marker and not has_tool_result:
             message = {"role": "assistant", "tool_calls": [
-                {"id": "call-a", "type": "function", "function": {"name": "read", "arguments": "{}"}},
-                {"id": "call-b", "type": "function", "function": {"name": "read", "arguments": "{}"}},
+                {"id": "call-a", "type": "function", "function": {"name": "read", "arguments": '{"path":"src/fixture_target.py"}'}},
+                {"id": "call-b", "type": "function", "function": {"name": "read", "arguments": '{"path":"src/fixture_target.py"}'}},
+            ]}
+        elif has_tool_result and "sequential" not in marker:
+            message = {"role": "assistant", "tool_calls": [
+                {"id": "call-2", "type": "function", "function": {"name": "read", "arguments": '{"path":"src/fixture_target.py"}'}},
             ]}
         elif "sequential" in marker and not has_tool_result:
             message = {"role": "assistant", "tool_calls": [
-                {"id": "call-1", "type": "function", "function": {"name": "read", "arguments": "{}"}},
+                {"id": "call-1", "type": "function", "function": {"name": "read", "arguments": '{"path":"src/fixture_target.py"}'}},
             ]}
         elif "reasoning" in marker and request.get("reasoning"):
             message = {"role": "assistant", "content": "CONTRACT_OK",
                        "reasoning_content": "fixture reasoning"}
         elif "NEEDLE-31K-7F3A" in marker:
             message = {"role": "assistant", "content": "NEEDLE-31K-7F3A"}
-        elif "code-generation" in marker:
+        elif "code-generation" in marker or "named add" in marker:
             message = {"role": "assistant", "content": "def add(a, b):\\n    return a + b"}
         elif "fixture_target" in marker:
             message = {"role": "assistant", "content": "src/fixture_target.py line 3"}
@@ -65,10 +69,12 @@ class Handler(BaseHTTPRequestHandler):
             message = {"role": "assistant", "content": "PRESERVE-USER-CONTENT"}
         else:
             message = {"role": "assistant", "content": "CONTRACT_OK"}
+        prompt_tokens = 32000 if "NEEDLE-31K-7F3A" in marker else 1
         response = {"id": "chatcmpl-fixture", "object": "chat.completion",
                     "model": "fixture-model", "choices": [{"index": 0, "message": message,
                     "finish_reason": "tool_calls" if "tool_calls" in message else "stop"}],
-                    "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}}
+                    "usage": {"prompt_tokens": prompt_tokens, "completion_tokens": 1,
+                              "total_tokens": prompt_tokens + 1}}
         if request.get("stream"):
             encoded = ("data: " + json.dumps({"choices": [{"delta": {"content": "CONTRACT_OK"}, "index": 0}]}) + "\n\n" 
                        "data: [DONE]\n\n").encode()

@@ -18,14 +18,19 @@ scripts/run-evaluation.sh \
 to the supplied workspace. Command execution is an explicit allowlist fixture
 (`printf EVAL_COMMAND_OK`); model-provided commands and paths are not run.
 Requests use temperature zero, a fixed seed, and stable JSON serialization.
-Long-context input is generated near the 32K target but is not retained in the
-report. Captures, transcripts, and strings are bounded and sanitized for paths,
-credentials, bearer tokens, GitHub tokens, and private keys.
+Long-context input is sent as a bounded wire request near the 32K target and
+its endpoint-reported usage is recorded; no filler is retained in the report.
+Overflow handling performs a real context-error retry with compacted messages
+and preserves a user marker. Cancellation closes the in-flight socket while the
+endpoint is delayed. Captures, transcripts, and strings are bounded and
+sanitized with sensitive-key and token-pattern redaction for paths, credentials,
+bearer/basic tokens, GitHub tokens, and private keys.
 
 The manifest covers chat, retrieval, code generation, navigation, disposable
 patching, command checks, malformed/sequential/parallel tool calls and replay,
 reasoning on/off, cancellation/recovery, overflow/compaction, and provenance.
 Reports use [`schemas/evaluation-report.schema.json`](../schemas/evaluation-report.schema.json)
-and contain per-case scores, a mean score, bounded provenance, lifecycle
-summaries, and safety assertions. A non-zero exit means at least one required
-case failed.
+and are validated against it before atomic publication. They contain per-case
+scores, a mean score, bounded provenance with deterministic input/schema/
+runner/workspace/request/response SHA-256 hashes, lifecycle summaries, and
+safety assertions. A non-zero exit means at least one required case failed.
