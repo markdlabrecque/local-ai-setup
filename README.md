@@ -95,6 +95,12 @@ bounded sanitized artifacts, and the report contract in
 [`schemas/evaluation-report.schema.json`](schemas/evaluation-report.schema.json).
 See [`docs/issue-11-evaluation.md`](docs/issue-11-evaluation.md).
 
+## Issue #10 Pi integration
+
+Pi uses the native llama.cpp provider for `/login llama.cpp` and `/llama`, plus
+the reviewed local Qwen metadata for thinking and coding-agent tool calls. See
+[`docs/issue-10-pi-integration.md`](docs/issue-10-pi-integration.md).
+
 ## Issue #9 router/API smoke test
 
 After installing the user service, the opt-in real lifecycle check validates

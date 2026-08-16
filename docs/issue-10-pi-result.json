@@ -1,0 +1,38 @@
+{
+  "checks": [
+    {
+      "duration_ms": 314.537,
+      "name": "model-discovery-and-metadata",
+      "passed": true
+    },
+    {
+      "duration_ms": 5025.746,
+      "name": "text-streaming-thinking-off",
+      "passed": true
+    },
+    {
+      "duration_ms": 39905.04,
+      "name": "qwen-thinking-high",
+      "passed": true
+    },
+    {
+      "duration_ms": 26868.625,
+      "name": "sequential-tool-result-replay",
+      "passed": true
+    },
+    {
+      "duration_ms": 26447.305,
+      "name": "parallel-tool-result-replay",
+      "passed": true
+    }
+  ],
+  "context_tokens": 32768,
+  "duration_ms": 98854.122,
+  "max_output_tokens": 4096,
+  "model": "Qwen3.5-27B-Q8_0",
+  "pi_version": "0.84.2",
+  "provider": "local-qwen",
+  "schema_version": 1,
+  "status": "pass",
+  "suite": "issue-10-pi-integration-smoke"
+}
