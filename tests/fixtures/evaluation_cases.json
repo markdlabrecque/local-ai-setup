@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "context_target_tokens": 32768,
+  "cases": [
+    {"id": "instruction-following", "kind": "chat", "prompt": "Reply with exactly: CONTRACT_OK", "expected": {"text": "CONTRACT_OK"}},
+    {"id": "long-context-retrieval", "kind": "retrieval", "needle": "NEEDLE-31K-7F3A", "filler_tokens": 31500, "expected": {"text": "NEEDLE-31K-7F3A"}},
+    {"id": "code-generation", "kind": "code", "expected": {"contains": ["def add", "return a + b"]}},
+    {"id": "repository-navigation", "kind": "navigation", "expected": {"path": "src/fixture_target.py", "line": 3}},
+    {"id": "patching", "kind": "patch", "expected": {"patch_applied": true, "repo_clean": true}},
+    {"id": "commands", "kind": "command", "expected": {"command": "printf EVAL_COMMAND_OK", "exit_code": 0}},
+    {"id": "malformed-tool-call", "kind": "tool", "tool_mode": "malformed", "expected": {"rejected": true}},
+    {"id": "sequential-tool-replay", "kind": "tool", "tool_mode": "sequential", "expected": {"replayed": true, "tool_calls": 2}},
+    {"id": "parallel-tool-replay", "kind": "tool", "tool_mode": "parallel", "expected": {"replayed": true, "tool_calls": 2}},
+    {"id": "reasoning-off", "kind": "reasoning", "reasoning": false, "expected": {"reasoning_tokens": 0}},
+    {"id": "reasoning-on", "kind": "reasoning", "reasoning": true, "expected": {"reasoning_tokens_gt": 0}},
+    {"id": "cancellation", "kind": "lifecycle", "expected": {"cancelled": true, "server_recovered": true}},
+    {"id": "overflow-compaction", "kind": "overflow", "expected": {"compacted": true, "lost_user_content": false}},
+    {"id": "provenance-artifacts", "kind": "provenance", "expected": {"has_request_id": true, "has_transcript": true, "sanitized": true}}
+  ]
+}
