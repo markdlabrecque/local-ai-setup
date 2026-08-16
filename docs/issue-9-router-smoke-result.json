@@ -1,0 +1,71 @@
+{
+  "checks": [
+    {
+      "duration_ms": 1.171,
+      "name": "health-and-model-inventory",
+      "passed": true
+    },
+    {
+      "duration_ms": 0.487,
+      "name": "failed-model-load-recovery",
+      "passed": true
+    },
+    {
+      "duration_ms": 28140.396,
+      "name": "verified-model-load",
+      "passed": true
+    },
+    {
+      "duration_ms": 2929.758,
+      "name": "streamed-chat",
+      "passed": true
+    },
+    {
+      "duration_ms": 1439.301,
+      "name": "stream-cancellation",
+      "passed": true
+    },
+    {
+      "duration_ms": 379103.178,
+      "name": "near-32k-context",
+      "passed": true
+    },
+    {
+      "duration_ms": 24316.695,
+      "name": "verified-model-unload",
+      "passed": true
+    },
+    {
+      "duration_ms": 307.054,
+      "name": "service-restart-recovery",
+      "passed": true
+    },
+    {
+      "duration_ms": 28125.327,
+      "name": "post-restart-model-load",
+      "passed": true
+    },
+    {
+      "duration_ms": 2485.958,
+      "name": "post-restart-streamed-chat",
+      "passed": true
+    },
+    {
+      "duration_ms": 24330.412,
+      "name": "final-model-unload",
+      "passed": true
+    }
+  ],
+  "context_tokens": 32768,
+  "duration_ms": 491180.041,
+  "endpoint": "http://127.0.0.1:8080",
+  "model": "Qwen3.5-27B-Q8_0",
+  "model_files_deleted": false,
+  "runtime": {
+    "commit": "adb55e5",
+    "ref": "b10446"
+  },
+  "schema_version": 1,
+  "status": "pass",
+  "suite": "issue-9-router-api-smoke"
+}
