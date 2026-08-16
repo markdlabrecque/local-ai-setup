@@ -160,9 +160,9 @@ MANIFEST_CONTENT="$MANIFEST_MARKER"$'\n'"$MANIFEST_JSON"$'\n'
 # systemd call or file replacement. A marker alone is not ownership proof:
 # the manifest binds the fixed paths to their recorded content hashes.
 validate_manifest() {
-  python3 - "$MANIFEST_PATH" "$UNIT_PATH" "$ENV_PATH" "$LAUNCHER_PATH" "$OWNERSHIP_MARKER" "$MANIFEST_MARKER" <<'PY'
+  python3 - "$MANIFEST_PATH" "$UNIT_PATH" "$ENV_PATH" "$LAUNCHER_PATH" "$OWNERSHIP_MARKER" "$MANIFEST_MARKER" "${1:-}" <<'PY'
 import hashlib, json, os, re, stat, sys
-manifest, unit, env, launcher, marker, manifest_marker = sys.argv[1:]
+manifest, unit, env, launcher, marker, manifest_marker, emit = sys.argv[1:]
 try:
     with open(manifest, "rb") as stream:
         raw = stream.read()
@@ -176,6 +176,7 @@ try:
     rows = data.get("artifacts")
     if not isinstance(rows, list) or len(rows) != len(expected):
         raise ValueError("invalid ownership artifact list")
+    owned_hashes = []
     for row, (ident, path) in zip(rows, expected):
         if not isinstance(row, dict) or set(row) != {"id", "path", "sha256"}:
             raise ValueError("invalid ownership artifact entry")
@@ -185,12 +186,16 @@ try:
         if not stat.S_ISREG(st.st_mode):
             raise ValueError("owned artifact is not a regular file")
         content = open(path, "rb").read()
-        if hashlib.sha256(content).hexdigest() != row["sha256"]:
+        digest = hashlib.sha256(content).hexdigest()
+        if digest != row["sha256"]:
             raise ValueError(f"owned artifact was changed: {path}")
+        owned_hashes.append(digest)
         if ident != "launcher" and marker.encode() not in content:
             raise ValueError(f"owned artifact marker missing: {path}")
         if ident == "launcher" and b"# Managed by install-router-service.sh" not in content:
             raise ValueError(f"owned launcher marker missing: {path}")
+    if emit:
+        print(" ".join(owned_hashes + [hashlib.sha256(raw).hexdigest()]))
 except (OSError, UnicodeError, ValueError, TypeError, json.JSONDecodeError) as exc:
     print(f"error: {exc}", file=sys.stderr)
     raise SystemExit(1)
@@ -201,19 +206,24 @@ PY
 # intact and owned. This preflight prevents partial replacement of a mixed set.
 if [[ -e "$MANIFEST_PATH" || -L "$MANIFEST_PATH" ]]; then
   [[ ! -L "$MANIFEST_PATH" ]] || die "refusing symlink manifest: $MANIFEST_PATH"
-  validate_manifest || die "refusing invalid or tampered ownership manifest"
+  OWNED_HASHES=$(validate_manifest emit) || die "refusing invalid or tampered ownership manifest"
+  read -r EXPECTED_UNIT_SHA EXPECTED_ENV_SHA EXPECTED_WRAPPER_SHA EXPECTED_MANIFEST_SHA <<<"$OWNED_HASHES"
 else
   for path in "$UNIT_PATH" "$ENV_PATH" "$LAUNCHER_PATH"; do
     [[ ! -L "$path" ]] || die "refusing symlink target: $path"
     [[ ! -e "$path" ]] || die "refusing to overwrite unowned existing file: $path"
   done
+  EXPECTED_UNIT_SHA=absent
+  EXPECTED_ENV_SHA=absent
+  EXPECTED_WRAPPER_SHA=absent
+  EXPECTED_MANIFEST_SHA=absent
 fi
 
 atomic_write() {
-  local destination=$1 mode=$2 content=$3
-  python3 - "$destination" "$mode" "$content" <<'PY'
+  local destination=$1 mode=$2 content=$3 expected_digest=$4
+  python3 - "$destination" "$mode" "$content" "$expected_digest" <<'PY'
 import hashlib, os, stat, subprocess, sys, uuid
-path, mode, content = sys.argv[1], int(sys.argv[2], 8), sys.argv[3].encode()
+path, mode, content, expected = sys.argv[1], int(sys.argv[2], 8), sys.argv[3].encode(), sys.argv[4]
 parent, name = os.path.split(path)
 
 # Walk the parent one component at a time and retain the final directory fd.
@@ -267,6 +277,10 @@ def parent_is_same():
     return stat.S_ISDIR(visible.st_mode) and identity(visible)[:2] == identity(held)[:2]
 
 before = state()
+if ((before is None) != (expected == "absent")):
+    raise SystemExit(f"destination no longer has its manifest-owned state: {path}")
+if before is not None and before[1] != expected:
+    raise SystemExit(f"destination does not match its manifest-owned hash: {path}")
 hook = os.environ.get("LOCAL_AI_TEST_HOOK")
 if hook:
     if os.environ.get("LOCAL_AI_TEST_MODE") != "1":
@@ -299,11 +313,11 @@ finally:
 PY
 }
 
-atomic_write "$UNIT_PATH" 0644 "$UNIT_CONTENT"
-atomic_write "$ENV_PATH" 0600 "$ENV_CONTENT"
-atomic_write "$LAUNCHER_PATH" 0755 "$WRAPPER_CONTENT"
+atomic_write "$UNIT_PATH" 0644 "$UNIT_CONTENT" "$EXPECTED_UNIT_SHA"
+atomic_write "$ENV_PATH" 0600 "$ENV_CONTENT" "$EXPECTED_ENV_SHA"
+atomic_write "$LAUNCHER_PATH" 0755 "$WRAPPER_CONTENT" "$EXPECTED_WRAPPER_SHA"
 # Publish the manifest last, so it never claims ownership of an incomplete set.
-atomic_write "$MANIFEST_PATH" 0600 "$MANIFEST_CONTENT"
+atomic_write "$MANIFEST_PATH" 0600 "$MANIFEST_CONTENT" "$EXPECTED_MANIFEST_SHA"
 
 systemctl_user() {
   command -v systemctl >/dev/null 2>&1 || die "systemctl is required"

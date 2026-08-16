@@ -61,9 +61,9 @@ fi
 [[ -e "$MANIFEST_PATH" ]] || die "ownership manifest is missing; refusing to remove files"
 
 validate_manifest() {
-  python3 - "$MANIFEST_PATH" "$UNIT_PATH" "$ENV_PATH" "$LAUNCHER_PATH" "$OWNERSHIP_MARKER" "$MANIFEST_MARKER" <<'PY'
+  python3 - "$MANIFEST_PATH" "$UNIT_PATH" "$ENV_PATH" "$LAUNCHER_PATH" "$OWNERSHIP_MARKER" "$MANIFEST_MARKER" "${1:-}" <<'PY'
 import hashlib, json, os, re, stat, sys
-manifest, unit, env, launcher, marker, manifest_marker = sys.argv[1:]
+manifest, unit, env, launcher, marker, manifest_marker, emit = sys.argv[1:]
 try:
     raw = open(manifest, "rb").read()
     lines = raw.decode("utf-8").splitlines()
@@ -76,6 +76,7 @@ try:
     rows = data.get("artifacts")
     if not isinstance(rows, list) or len(rows) != len(expected):
         raise ValueError("invalid ownership artifact list")
+    owned_hashes = []
     for row, (ident, path) in zip(rows, expected):
         if not isinstance(row, dict) or set(row) != {"id", "path", "sha256"}:
             raise ValueError("invalid ownership artifact entry")
@@ -85,16 +86,22 @@ try:
         if not stat.S_ISREG(st.st_mode):
             raise ValueError("owned artifact is not a regular file")
         content = open(path, "rb").read()
-        if hashlib.sha256(content).hexdigest() != row["sha256"]:
+        digest = hashlib.sha256(content).hexdigest()
+        if digest != row["sha256"]:
             raise ValueError(f"owned artifact was changed: {path}")
+        owned_hashes.append(digest)
         if marker.encode() not in content:
             raise ValueError(f"owned artifact marker missing: {path}")
+    if emit:
+        print(" ".join(owned_hashes + [hashlib.sha256(raw).hexdigest()]))
 except (OSError, UnicodeError, ValueError, TypeError, json.JSONDecodeError) as exc:
     print(f"error: {exc}", file=sys.stderr)
     raise SystemExit(1)
 PY
 }
-validate_manifest || die "refusing to uninstall artifacts that are not exactly installer-owned"
+OWNED_HASHES=$(validate_manifest emit) ||
+  die "refusing to uninstall artifacts that are not exactly installer-owned"
+read -r EXPECTED_UNIT_SHA EXPECTED_ENV_SHA EXPECTED_WRAPPER_SHA EXPECTED_MANIFEST_SHA <<<"$OWNED_HASHES"
 
 # Hold the unit's parent directory while the lifecycle decision is made.  The
 # final path and content are checked again after the optional, explicitly gated
@@ -155,7 +162,6 @@ os.close(fd)
 PY
 }
 revalidate_before_lifecycle || die "ownership changed before service lifecycle action"
-validate_manifest || die "ownership changed before service lifecycle action"
 
 systemctl_user() {
   command -v systemctl >/dev/null 2>&1 || die "systemctl is required"
@@ -163,15 +169,22 @@ systemctl_user() {
   timeout --foreground --signal=TERM --kill-after=5s 15s systemctl --user "$@"
 }
 
-# Ownership is fully validated before these lifecycle actions. An absent unit
-# is normal on repeated uninstall; no manager call is made for an unowned set.
+# Revalidate the complete manifest immediately before each distinct manager
+# action. A replacement introduced while stop runs is therefore refused before
+# disable, and no manager call begins from a stale ownership decision.
+validate_manifest || die "ownership changed before service stop"
 systemctl_user stop "$SERVICE_NAME" || true
+validate_manifest || die "ownership changed before service disable"
 systemctl_user disable "$SERVICE_NAME" || true
+validate_manifest || die "ownership changed before artifact removal"
 
 remove_exact() {
   python3 - "$@" <<'PY'
 import hashlib, os, stat, subprocess, sys
-for path in sys.argv[1:]:
+args = sys.argv[1:]
+if len(args) % 2:
+    raise SystemExit("removal paths and ownership hashes are not paired")
+for path, expected_digest in zip(args[::2], args[1::2]):
     parent, name = os.path.split(path)
     fd = os.open("/", os.O_PATH | os.O_DIRECTORY)
     try:
@@ -213,18 +226,25 @@ for path in sys.argv[1:]:
 
     try:
         before = state()
+        if before[1] != expected_digest:
+            raise SystemExit(f"removal target does not match manifest ownership: {path}")
         hook = os.environ.get("LOCAL_AI_TEST_HOOK")
         if hook:
             if os.environ.get("LOCAL_AI_TEST_MODE") != "1":
                 raise SystemExit("test race hook requires LOCAL_AI_TEST_MODE=1")
             subprocess.run([hook, "before-remove", path], check=True)
-        if not parent_is_same() or state() != before:
+        final = state()
+        if not parent_is_same() or final != before or final[1] != expected_digest:
             raise SystemExit(f"removal ownership changed: {path}")
         os.unlink(name, dir_fd=fd)
     finally:
         os.close(fd)
 PY
 }
-remove_exact "$UNIT_PATH" "$ENV_PATH" "$LAUNCHER_PATH" "$MANIFEST_PATH"
+remove_exact \
+  "$UNIT_PATH" "$EXPECTED_UNIT_SHA" \
+  "$ENV_PATH" "$EXPECTED_ENV_SHA" \
+  "$LAUNCHER_PATH" "$EXPECTED_WRAPPER_SHA" \
+  "$MANIFEST_PATH" "$EXPECTED_MANIFEST_SHA"
 systemctl_user daemon-reload
 printf 'Uninstalled %s (model and runtime data preserved)\n' "$SERVICE_NAME"
