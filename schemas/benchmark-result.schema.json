@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/markdlabrecque/local-ai-setup/schemas/benchmark-result.schema.json",
+  "title": "Issue 12 reproducible benchmark result",
+  "type": "object",
+  "required": ["schema_version", "benchmark", "inputs", "runs", "summary", "safety", "provenance"],
+  "properties": {
+    "schema_version": {"const": "benchmark-v1"},
+    "benchmark": {"type": "object", "required": ["name", "version"], "properties": {"name": {"const": "issue-12-benchmark"}, "version": {"const": 1}}, "additionalProperties": true},
+    "inputs": {"type": "object", "required": ["prompt", "output", "context_tokens", "candidate"], "properties": {"prompt": {"type": "object", "required": ["token_count"]}, "output": {"type": "object", "required": ["token_count"]}, "context_tokens": {"type": "integer", "minimum": 32768}, "candidate": {"type": "object"}}, "additionalProperties": true},
+    "runs": {"type": "array", "minItems": 2, "items": {
+      "type": "object", "required": ["mode", "cache", "status", "lifecycle", "metrics", "hardware", "settings", "quality"],
+      "properties": {
+        "mode": {"enum": ["cold", "warm"]}, "cache": {"enum": ["miss", "hit"]}, "status": {"enum": ["pass", "fail", "timeout"]},
+        "lifecycle": {"type": "object", "required": ["started", "bounded", "finished"], "properties": {"started": {"const": true}, "bounded": {"const": true}, "finished": {"const": true}}},
+        "metrics": {"type": "object", "required": ["load_time_ms", "ttft_ms", "prompt_eval_ms", "prompt_tokens", "prompt_tokens_per_second", "generation_tokens", "generation_tokens_per_second"], "properties": {"load_time_ms": {"type": "number", "minimum": 0}, "ttft_ms": {"type": "number", "minimum": 0}, "prompt_eval_ms": {"type": "number", "minimum": 0}, "prompt_tokens": {"const": 16}, "prompt_tokens_per_second": {"type": "number", "exclusiveMinimum": 0}, "generation_tokens": {"const": 8}, "generation_tokens_per_second": {"type": "number", "exclusiveMinimum": 0}}, "additionalProperties": true},
+        "hardware": {"type": "object", "required": ["selected_gpu", "ram", "vram", "swap"], "properties": {"selected_gpu": {"type": "string"}, "ram": {"type": "object", "required": ["minimum_available_mib", "passed"]}, "vram": {"type": "object", "required": ["capacity_mib", "peak_mib", "passed"]}, "swap": {"type": "object", "required": ["in_pages", "passed"]}}},
+        "settings": {"type": "object", "required": ["model", "quantization", "build", "device", "context_tokens", "parameters"]},
+        "quality": {"type": "object", "required": ["suite", "report_sha256", "passed"], "properties": {"suite": {"const": "issue-11-evaluation"}, "report_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "passed": {"type": "boolean"}}}
+      }
+    }},
+    "summary": {"type": "object", "required": ["status", "passed_runs"]},
+    "safety": {"type": "object", "required": ["selected_gpu", "swap_in_pages", "ram_passed", "vram_passed"]},
+    "provenance": {"type": "object", "required": ["config_sha256", "tuning_result_sha256", "evaluator_report_sha256", "artifact_sha256"], "properties": {"config_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "tuning_result_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "evaluator_report_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "sanitized": {"const": true}}, "additionalProperties": false}
+  },
+  "additionalProperties": false
+}

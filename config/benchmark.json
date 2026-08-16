@@ -1,0 +1,32 @@
+{
+  "schema_version": "benchmark-v1",
+  "name": "issue-12-benchmark",
+  "tuning_result": "docs/issue-6-hybrid-vulkan-tuning-result.json",
+  "evaluator": {
+    "suite": "issue-11-evaluation",
+    "schema": "schemas/evaluation-report.schema.json"
+  },
+  "model": {
+    "id": "Qwen3.5-27B-Q8_0",
+    "quantization": "Q8_0",
+    "sha256": "6b0a101b0a86697fe11eabcc1a7db72699a9f3d4b18b6a1ac75ea3fb2c26c450"
+  },
+  "build": {"ref": "b10446", "commit": "adb55e5"},
+  "prompt": {"text": "Respond with exactly: LOCAL_AI_BENCHMARK_OK", "token_count": 16},
+  "output": {"token_count": 8},
+  "context_tokens": 32768,
+  "lifecycle": {
+    "modes": ["cold", "warm"],
+    "cold": {"cache_miss": true, "new_process": true},
+    "warm": {"cache_hit": true, "new_process": true}
+  },
+  "timeout_seconds": 120,
+  "cleanup": {"process_group": true, "term_grace_seconds": 0.2, "capture_bytes": 65536},
+  "safety": {
+    "selected_gpu": "Vulkan0",
+    "minimum_free_vram_mib": 1024,
+    "minimum_available_vram_mib": 1024,
+    "minimum_available_ram_mib": 8192,
+    "maximum_swap_in_pages": 0
+  }
+}
