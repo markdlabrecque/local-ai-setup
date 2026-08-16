@@ -261,8 +261,7 @@ def timing_metrics(combined):
     prompt = parse(r"prompt\s+eval")
     generation = parse(r"(?<!prompt\s)eval\s+time")
     return {"prompt_eval_ms": prompt[0], "prompt_tokens": prompt[1], "prompt_tokens_per_second": prompt[2],
-            "generation_eval_ms": generation[0], "generation_tokens": generation[1], "generation_tokens_per_second": generation[2],
-            "time_to_first_token_ms": prompt[0]}
+            "generation_eval_ms": generation[0], "generation_tokens": generation[1], "generation_tokens_per_second": generation[2]}
 
 
 def parse_run(raw, parameters, context, prompt, safety, command, supplied=None):
@@ -272,9 +271,11 @@ def parse_run(raw, parameters, context, prompt, safety, command, supplied=None):
                         if re.search(r"vulkan", x, re.I) and re.search(r"RX[ -]?6900", x, re.I)), "unavailable")
     context_ok = bool(re.search(r"n_ctx\s*=\s*" + str(context), combined, re.I))
     offload = bool(re.search(r"(?i)(offload|offloaded|layers?.*(?:vulkan|gpu)|(?:vulkan|gpu).*layers?)", combined))
-    stop = bool(re.search(r"(?i)(finish_reason\s*=\s*stop|stop reason\s*[:=]\s*stop|stopped-by-EOS)", combined))
+    stop = bool(re.search(r"(?i)(finish_reason\s*=\s*stop|stop reason\s*[:=]\s*stop|stopped[-\s]+by[-\s]+EOS)", combined))
     metrics = timing_metrics(combined)
     metrics.update(raw.get("host", {}))
+    metrics["exit_code"] = raw.get("exit_code")
+    metrics["timed_out"] = bool(raw.get("timed_out"))
     exact = completion == EXPECTED_COMPLETION
     quality = (raw["exit_code"] == 0 and not raw["timed_out"] and device_line != "unavailable" and context_ok and offload and stop and exact
                and all(isinstance(metrics.get(k), (int, float)) and metrics[k] > 0 for k in
@@ -463,17 +464,18 @@ def main():
         else:
             metric_keys = ("prompt_eval_ms", "generation_eval_ms", "prompt_tokens_per_second", "generation_tokens_per_second")
             metrics = {k: sum(a["metrics"][k] for a in attempts) / len(attempts) for k in metric_keys}
-            metrics["prompt_tokens"] = min(a["metrics"]["prompt_tokens"] for a in attempts)
+            metrics["prompt_tokens"] = max(a["metrics"]["prompt_tokens"] for a in attempts)
             metrics["generation_tokens"] = min(a["metrics"]["generation_tokens"] for a in attempts)
             for k in ("vram_capacity_mib", "peak_vram_mib", "min_mem_available_mib", "swap_in_pages", "swap_out_pages"):
                 vals = [a["metrics"].get(k) for a in attempts]
                 metrics[k] = (max(vals) if k in ("peak_vram_mib", "swap_in_pages", "swap_out_pages") else min(vals)) if all(isinstance(v, (int, float)) for v in vals) else None
-            metrics["time_to_first_token_ms"] = metrics["prompt_eval_ms"]; metrics["exit_code"] = 0; metrics["timed_out"] = False
+            metrics["exit_code"] = 0; metrics["timed_out"] = False
             evidence = attempts[-1]["evidence"] | {"attempt_count": 3, "long_context_canary": True, "attempt_ids": [a["attempt_id"] for a in attempts]}
             quality = {"device_confirmed": all(a["quality"]["device_confirmed"] for a in attempts), "context_confirmed": all(a["quality"]["context_confirmed"] for a in attempts),
                        "exact_completion": all(a["quality"]["exact_completion"] for a in attempts), "timing_confirmed": True, "stability_confirmed": True, "passed": True}
             status = "pass"
-        row_metrics = metrics if status == "pass" else {"exit_code": attempts[-1]["metrics"].get("exit_code", 127), "timed_out": True}
+        row_metrics = metrics if status == "pass" else {"exit_code": attempts[-1]["metrics"].get("exit_code", 127),
+                                                        "timed_out": attempts[-1]["metrics"].get("timed_out", False)}
         row_evidence = dict(evidence if status == "pass" else attempts[-1]["evidence"])
         # Bind the aggregate metrics into the evidence identity: changing a
         # measured value must make resume fail closed, not silently reuse it.

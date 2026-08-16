@@ -77,7 +77,7 @@ assert {(r["parameters"]["gpu_layers"], r["parameters"]["flash_attention"]) for 
 for run in runs:
     p, m = run["parameters"], run["metrics"]
     assert p["batch"] == 256 and p["ubatch"] == 128 and p["kv_cache"] == "q8_0"
-    for key in ("time_to_first_token_ms", "prompt_tokens_per_second", "generation_tokens_per_second",
+    for key in ("prompt_eval_ms", "prompt_tokens_per_second", "generation_tokens_per_second",
                 "peak_vram_mib", "min_mem_available_mib", "swap_in_pages", "exit_code", "timed_out"):
         assert key in m, (key, run)
     assert m["timed_out"] is False and m["exit_code"] == 0
