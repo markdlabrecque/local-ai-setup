@@ -8,6 +8,10 @@
   "build": {"ref": "b10446", "commit": "adb55e5"},
   "prompt": "Respond with exactly: LOCAL_AI_HYBRID_TUNING_OK",
   "context_tokens": 32768,
+  "stability": {
+    "consecutive_requests": 3,
+    "long_context_canary_tokens": 32000
+  },
   "matrix": {
     "gpu_layers": [16, 20],
     "flash_attention": ["on", "off"],

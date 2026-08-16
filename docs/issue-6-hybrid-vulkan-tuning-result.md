@@ -4,8 +4,10 @@ Sanitized result: [`issue-6-hybrid-vulkan-tuning-result.json`](issue-6-hybrid-vu
 
 The practical Q8_0 matrix ran on the RX 6900 XT with the pinned llama.cpp
 `b10446` / `adb55e5` build, the fixed exact-completion prompt, and a 32768-token
-context. All four candidates passed completion, device/context/offload,
-VRAM-headroom, RAM, swap, exit, and timeout checks.
+context. All four candidates passed exact completion, device/context/offload,
+VRAM-headroom, RAM, swap, exit, timeout, and measured timing checks. Each
+parameter tuple is exercised by three bounded consecutive requests; the final
+request is a measured >=32,000-token long-context canary before selection.
 
 | GPU layers | Flash attention | Batch / ubatch | KV cache | Result | Peak VRAM MiB | Minimum available MiB | Generation tok/s |
 |---:|:---:|---:|:---:|:---:|---:|---:|---:|
@@ -17,8 +19,11 @@ VRAM-headroom, RAM, swap, exit, and timeout checks.
 The deterministic stable candidate is **20 GPU layers, flash attention on,
 batch 256, ubatch 128, q8_0 KV cache**. VRAM capacity was 16368 MiB, leaving
 at least the required 1 GiB desktop headroom; swap-in pages were zero for every
-run. The selection policy considers only quality/safety passes, then orders by
-generation throughput, prompt throughput, TTFT, VRAM, and parameter tuple.
+run. Selection considers only fully stable quality/safety passes, then orders
+by generation throughput descending, prompt throughput descending, prompt and
+generation evaluation time ascending, peak VRAM ascending, and tuple ID
+ascending. Timing fields are measured `prompt_eval_ms` and
+`generation_eval_ms`; they are never substituted with zero defaults.
 
 ## Reproduction
 
@@ -32,6 +37,8 @@ scripts/run-hybrid-vulkan-tuning.sh \
   --config config/hybrid-vulkan-tuning.json \
   --model "$MODEL" --llama-cli "$LLAMA_CLI" \
   --output "$OUTPUT" --run-timeout 1800
+# The harness forwards both --cache-type-k q8_0 and --cache-type-v q8_0;
+# do not pass --measurements (injected resource values are rejected).
 ```
 
 Resume uses the same output and rejects a changed configuration identity:
@@ -41,7 +48,15 @@ scripts/run-hybrid-vulkan-tuning.sh \
   --config config/hybrid-vulkan-tuning.json \
   --model "$MODEL" --llama-cli "$LLAMA_CLI" \
   --output "$OUTPUT" --resume --run-timeout 1800
+
+Resume is fail-closed: it validates the schema, config identity, tuple and
+attempt identities, lifecycle, exact completion/timing evidence, and the
+metrics-bound evidence ID before skipping a tuple.
 ```
 
 Only the sanitized JSON result and this summary are tracked; raw logs and the
-model are not.
+model are not. Live runs reject `--measurements` injection. Each run retains
+bounded sanitized command/device/PCI/offload/provenance evidence and atomic
+per-tuple attempt records. Resume validates schema, config ID, tuple ID,
+completion evidence, lifecycle, and the evidence-bound metrics before skipping
+a completed tuple.
