@@ -6,6 +6,7 @@ real user manager, router, model, or runtime binary is started by this suite.
 import json
 import os
 import re
+import shutil
 import stat
 import subprocess
 import tempfile
@@ -83,16 +84,29 @@ class Issue8SystemdService(unittest.TestCase):
         self.assertTrue(1 <= int(float(service["TimeoutStopSec"][-1].rstrip("s"))) <= 60)
         self.assertEqual(service.get("KillMode", [None])[-1], "control-group")
 
-        # A 28 GiB model plus a 60 GiB RAM / 121 GiB swap host must not be
-        # made impossible by an accidentally copied desktop-sized limit.
-        ram_floor = 60 * 1024**3
-        swap_floor = 121 * 1024**3
-        for key, floor in (("MemoryMax", ram_floor), ("MemoryHigh", ram_floor),
-                           ("MemoryLimit", ram_floor), ("MemorySwapMax", swap_floor)):
+        # The measured baseline needs at least 8 GiB of RAM headroom.  The
+        # hard ceiling must still admit the observed ~27.5 GiB peak, while
+        # swap remains finite and materially below the host's full 121 GiB.
+        ram_floor = 8 * 1024**3
+        peak_floor = int(27.5 * 1024**3)
+        for key in ("MemoryHigh", "MemoryMax", "MemoryLimit"):
             for value in service.get(key, []):
                 actual = systemd_bytes(value)
-                self.assertTrue(actual is None or actual >= floor,
-                                f"{key} caps below workload baseline: {value}")
+                self.assertIsNotNone(actual, f"{key} must be finite: {value}")
+                self.assertGreaterEqual(actual, ram_floor,
+                                        f"{key} caps below RAM baseline: {value}")
+        hard_caps = service.get("MemoryMax", [])
+        self.assertTrue(hard_caps, "service needs an explicit MemoryMax ceiling")
+        self.assertTrue(any(systemd_bytes(value) >= peak_floor for value in hard_caps),
+                        "MemoryMax rejects the measured 27.5 GiB peak")
+        swap_caps = service.get("MemorySwapMax", [])
+        self.assertTrue(swap_caps, "service needs an explicit swap ceiling")
+        for value in swap_caps:
+            actual = systemd_bytes(value)
+            self.assertIsNotNone(actual, "swap must not be unlimited")
+            self.assertGreater(actual, 0, "swap ceiling must retain a finite emergency reserve")
+            self.assertLess(actual, 121 * 1024**3,
+                            "swap ceiling must prevent swapping across the full host")
 
         output = " ".join(service.get("StandardOutput", []) + service.get("StandardError", []))
         self.assertIn("journal", output, "service logs must remain visible in the journal")
@@ -232,6 +246,168 @@ class Issue8SystemdService(unittest.TestCase):
             self.assertTrue(unit.is_symlink() and envs[0].is_symlink())
             self.assertEqual(outside_unit.read_text(), "outside unit sentinel")
             self.assertEqual(outside_env.read_text(), "outside env sentinel")
+
+    def test_systemd_analyze_verify_is_a_real_gate_when_available(self):
+        analyzer = shutil.which("systemd-analyze")
+        if analyzer is None:
+            self.skipTest("systemd-analyze is unavailable")
+        # verify also checks ExecStart existence.  Supply only that disposable
+        # runtime fixture so the gate validates the tracked unit's actual
+        # systemd syntax without writing to the host user's home.
+        with tempfile.TemporaryDirectory(prefix="issue8-verify-") as tmp:
+            root = Path(tmp)
+            launcher = root / "run-router.sh"
+            launcher.write_text("#!/bin/sh\\n")
+            launcher.chmod(0o755)
+            text = UNIT_SOURCE.read_text()
+            self.assertEqual(text.count("%h/.local/bin/run-router.sh"), 1)
+            checked = root / SERVICE
+            checked.write_text(text.replace("%h/.local/bin/run-router.sh", str(launcher)))
+            result = subprocess.run(
+                [analyzer, "verify", str(checked)],
+                cwd=ROOT, text=True, capture_output=True, timeout=10,
+            )
+        output = result.stdout + result.stderr
+        self.assertEqual(result.returncode, 0, output)
+        self.assertNotRegex(output, r"(?i)invalid|ignoring|failed",
+                             "systemd-analyze verify reported a unit error")
+
+    def test_all_resource_byte_values_use_systemd_byte_syntax(self):
+        text = UNIT_SOURCE.read_text()
+        parsed = directives(text).get("Service", {})
+        byte_keys = {"MemoryHigh", "MemoryMax", "MemoryLimit", "MemorySwapMax"}
+        # systemd accepts integer quantities with its documented binary/decimal
+        # suffixes; spellings outside that grammar must not be silently treated
+        # as a different unit by a hand-rolled parser.
+        syntax = re.compile(r"^[0-9]+(?:[KMGTPE](?:B)?|[kmgtpe](?:b)?|B|b)?$")
+        for key in byte_keys:
+            for value in parsed.get(key, []):
+                self.assertRegex(value, syntax, f"invalid systemd byte syntax: {key}={value}")
+
+    def test_installer_refuses_unowned_regular_files_and_marks_owned_artifacts(self):
+        artifacts = {
+            "unit": lambda root: root / "xdg config;literal" / "systemd" / "user" / SERVICE,
+            "environment": lambda root: root / "xdg config;literal" / "local-ai" / "router.env",
+            "launcher": lambda root: root / "home with spaces;literal" / ".local" / "bin" / "run-router.sh",
+        }
+        for name, path_for in artifacts.items():
+            with self.subTest(artifact=name), tempfile.TemporaryDirectory(prefix="issue8-owned-") as tmp:
+                root = Path(tmp)
+                path = path_for(root)
+                path.parent.mkdir(parents=True)
+                path.write_text(f"unowned {name} sentinel\\n")
+                before = path.read_bytes()
+                result = self.run_lifecycle(INSTALL, root)
+                self.assertNotEqual(result.returncode, 0,
+                                    f"installer overwrote unowned {name}")
+                self.assertEqual(path.read_bytes(), before)
+
+        with tempfile.TemporaryDirectory(prefix="issue8-owned-markers-") as tmp:
+            root = Path(tmp)
+            result = self.run_lifecycle(INSTALL, root)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            unit, envs = self.installed_paths(root)
+            launcher = root / "home with spaces;literal" / ".local" / "bin" / "run-router.sh"
+            for artifact in (unit, envs[0], launcher):
+                self.assertIn("Managed by install-router-service.sh", artifact.read_text(),
+                              f"{artifact} has no installer ownership marker")
+
+    def test_uninstall_refuses_and_preserves_unowned_artifacts(self):
+        targets = ("unit", "environment", "launcher")
+        for target in targets:
+            with self.subTest(artifact=target), tempfile.TemporaryDirectory(prefix="issue8-unowned-") as tmp:
+                root = Path(tmp)
+                installed = self.run_lifecycle(INSTALL, root)
+                self.assertEqual(installed.returncode, 0, installed.stderr)
+                unit, envs = self.installed_paths(root)
+                paths = {"unit": unit, "environment": envs[0],
+                         "launcher": root / "home with spaces;literal" / ".local" / "bin" / "run-router.sh"}
+                paths[target].write_text(f"unowned replacement {target}\\n")
+                result = self.run_lifecycle(UNINSTALL, root)
+                self.assertNotEqual(result.returncode, 0,
+                                    f"uninstaller accepted unowned {target}")
+                self.assertEqual(paths[target].read_text(), f"unowned replacement {target}\\n")
+                self.assertTrue(all(path.exists() for path in paths.values()),
+                                "uninstall removed an artifact it did not own")
+                calls = (root / "systemctl.jsonl").read_text()
+                self.assertNotRegex(calls, r'"stop"|"disable"',
+                                    "uninstall acted on the service before ownership validation")
+
+    def test_parent_symlinks_are_rejected_without_outside_writes(self):
+        cases = ("xdg", "launcher")
+        for parent in cases:
+            with self.subTest(parent=parent), tempfile.TemporaryDirectory(prefix="issue8-parent-") as tmp:
+                root = Path(tmp)
+                outside = root / "outside"
+                outside.mkdir()
+                home = root / "home with spaces;literal"
+                xdg = root / "xdg config;literal"
+                data = root / "data with spaces"
+                home.mkdir(); data.mkdir()
+                if parent == "xdg":
+                    xdg.symlink_to(outside, target_is_directory=True)
+                else:
+                    xdg.mkdir()
+                    local = home / ".local"
+                    local.mkdir()
+                    (local / "bin").symlink_to(outside, target_is_directory=True)
+                before = sorted(p.relative_to(outside).as_posix() for p in outside.rglob("*"))
+                result = self.run_lifecycle(INSTALL, root)
+                after = sorted(p.relative_to(outside).as_posix() for p in outside.rglob("*"))
+                self.assertNotEqual(result.returncode, 0,
+                                    f"installer followed {parent} parent symlink")
+                self.assertEqual(after, before, "installer wrote outside its configured roots")
+
+    def test_uninstall_rejects_parent_symlinks_without_deleting_outside_files(self):
+        for parent in ("xdg", "launcher"):
+            with self.subTest(parent=parent), tempfile.TemporaryDirectory(prefix="issue8-uninstall-parent-") as tmp:
+                root = Path(tmp)
+                outside = root / "outside"
+                outside.mkdir()
+                home = root / "home with spaces;literal"; home.mkdir()
+                data = root / "data with spaces"; data.mkdir()
+                xdg = root / "xdg config;literal"
+                if parent == "xdg":
+                    xdg_target = outside / "config-root"
+                    (xdg_target / "systemd" / "user").mkdir(parents=True)
+                    (xdg_target / "local-ai").mkdir()
+                    (xdg_target / "systemd" / "user" / SERVICE).write_text(
+                        "# Managed by install-router-service.sh\\nowned-looking unit\\n")
+                    (xdg_target / "local-ai" / "router.env").write_text(
+                        "# Managed by install-router-service.sh\\nowned-looking env\\n")
+                    xdg.symlink_to(xdg_target, target_is_directory=True)
+                else:
+                    xdg.mkdir()
+                    local = home / ".local"
+                    local.mkdir()
+                    (local / "bin").symlink_to(outside, target_is_directory=True)
+                    (outside / "run-router.sh").write_text(
+                        "#!/bin/sh\\n# Managed by install-router-service.sh; invokes the Issue #7 launcher.\\n")
+                before = {p.relative_to(outside).as_posix(): p.read_bytes()
+                          for p in outside.rglob("*") if p.is_file()}
+                result = self.run_lifecycle(UNINSTALL, root)
+                after = {p.relative_to(outside).as_posix(): p.read_bytes()
+                         for p in outside.rglob("*") if p.is_file()}
+                self.assertNotEqual(result.returncode, 0,
+                                    "uninstaller followed a configured parent symlink")
+                self.assertEqual(after, before, "uninstaller deleted outside files")
+
+    def test_launcher_override_must_be_absolute_and_normalized(self):
+        for override in ("scripts/run-router.sh", str(ROOT / "scripts" / ".." / "scripts" / "run-router.sh")):
+            with self.subTest(override=override), tempfile.TemporaryDirectory(prefix="issue8-launcher-path-") as tmp:
+                result = self.run_lifecycle(INSTALL, Path(tmp),)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                env = os.environ.copy()
+                bindir, _ = self.fake_systemctl(Path(tmp))
+                env.update({"HOME": str(Path(tmp) / "home"),
+                            "XDG_CONFIG_HOME": str(Path(tmp) / "xdg"),
+                            "XDG_DATA_HOME": str(Path(tmp) / "data"),
+                            "PATH": f"{bindir}:{env['PATH']}",
+                            "LOCAL_AI_RUN_ROUTER": override})
+                result = subprocess.run([str(INSTALL)], cwd=ROOT, env=env,
+                                        text=True, capture_output=True, timeout=5)
+                self.assertNotEqual(result.returncode, 0,
+                                    f"accepted non-normalized launcher override {override!r}")
 
     def test_operator_documentation_covers_complete_lifecycle(self):
         self.assertTrue(DOC.is_file(), "missing Issue #8 operator documentation")
