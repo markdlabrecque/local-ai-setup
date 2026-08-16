@@ -105,9 +105,10 @@ try:
         artifact = models / filename
         if not artifact.is_file() or not os.access(artifact, os.R_OK) or artifact.stat().st_size == 0:
             continue
-        # INI section names are b10446 model filenames; its HTTP API uses the
-        # corresponding extensionless stem as the model identifier.
-        lines.extend([f"[{filename}]", "c = 32768", "device = Vulkan0",
+        # b10446 strips .gguf when deriving models-dir IDs. The preset section
+        # must use that extensionless ID or it becomes a separate pathless model.
+        model_id = filename[:-5]
+        lines.extend([f"[{model_id}]", "c = 32768", "device = Vulkan0",
                       "n-gpu-layers = 20", "flash-attn = on", "b = 256",
                       "ub = 128", "cache-type-k = q8_0", "cache-type-v = q8_0",
                       "load-on-startup = false", "stop-timeout = 10", ""])

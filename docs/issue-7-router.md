@@ -63,3 +63,14 @@ scripts/router-smoke.sh --real --base-url http://127.0.0.1:8080
 
 This checks only `/health` and `/models`; it does not start llama-server or
 load/delete a model. A model load can be requested separately with the helper.
+
+## Target-host validation
+
+The real pinned router was exercised on the target host with the verified Q8_0
+artifact. `/health` returned `ok`; `/models` initially exposed only the
+extensionless `Qwen3.5-27B-Q8_0` ID in `unloaded` state; no model was preloaded.
+The checksum-gated helper then loaded it successfully. The router-reported child
+arguments confirmed context 32768, `Vulkan0`, 20 GPU layers, flash attention,
+batch 256, ubatch 128, and q8_0 K and V caches. The helper subsequently unloaded
+the model, and launcher cleanup left no router process listening on port 8080.
+No machine-specific paths or raw logs are committed.

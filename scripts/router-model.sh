@@ -69,7 +69,9 @@ mkdir -p -- "$MODELS_DIR"
 [[ -f "$model_path" && -r "$model_path" ]] || { echo "error: model artifact is missing: $filename" >&2; exit 1; }
 command -v flock >/dev/null 2>&1 || { echo 'error: flock is required' >&2; exit 1; }
 exec {lock_fd}>"$lock_path"
-flock -x "$lock_fd"
+# Cooperate with the downloader's exclusive lock while permitting independent
+# read-only identity checks to share the verified artifact.
+flock -s "$lock_fd"
 
 identity_stat=''
 verify_identity() {
@@ -130,8 +132,14 @@ while time.monotonic() < deadline:
         if not isinstance(rows, list): raise ValueError("/models data is not a list")
         matching = [row for row in rows if isinstance(row, dict) and row.get("id") == model_id]
         if len(matching) == 1:
-            last = str(matching[0].get("status", "missing status"))
-            if last == desired:
+            status = matching[0].get("status", "missing status")
+            if isinstance(status, dict):
+                if status.get("failed") is True:
+                    print(f"error: router model operation failed: {status}", file=sys.stderr)
+                    raise SystemExit(1)
+                status = status.get("value", "missing status value")
+            last = str(status)
+            if status == desired:
                 raise SystemExit(0)
         else:
             last = "model missing from /models"

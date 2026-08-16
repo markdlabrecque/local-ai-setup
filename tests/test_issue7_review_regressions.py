@@ -275,7 +275,7 @@ class Issue7ReviewRegressions(unittest.TestCase):
             (models / "Qwen3.5-27B-Q8_0.gguf").write_bytes(b"q8")
             process, _port, log, _runtime = self.start_router(
                 root, models=models,
-                environment={"EXPECTED_SECTIONS": json.dumps(["Qwen3.5-27B-Q8_0.gguf"])},
+                environment={"EXPECTED_SECTIONS": json.dumps(["Qwen3.5-27B-Q8_0"])},
             )
             try:
                 with urlopen(f"http://127.0.0.1:{_port}/models") as response:
@@ -290,7 +290,7 @@ class Issue7ReviewRegressions(unittest.TestCase):
             process, _port, _log, _runtime = self.start_router(
                 root, models=models,
                 environment={"EXPECTED_SECTIONS": json.dumps([
-                    "Qwen3.5-27B-Q8_0.gguf", "Qwen3.5-27B-Q6_K.gguf"])},
+                    "Qwen3.5-27B-Q8_0", "Qwen3.5-27B-Q6_K"])},
             )
             self.stop_router(process)
             self.assertTrue(log.exists())
