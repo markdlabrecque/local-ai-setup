@@ -84,17 +84,25 @@ class Issue8SystemdService(unittest.TestCase):
         self.assertTrue(1 <= int(float(service["TimeoutStopSec"][-1].rstrip("s"))) <= 60)
         self.assertEqual(service.get("KillMode", [None])[-1], "control-group")
 
-        # The measured baseline needs at least 8 GiB of RAM headroom.  The
-        # hard ceiling must still admit the observed ~27.5 GiB peak, while
-        # swap remains finite and materially below the host's full 121 GiB.
-        ram_floor = 8 * 1024**3
+        # Keep the effective cgroup limits below the physical host-safe
+        # ceiling, while admitting the measured Q8_0 peak.  The 121 GiB
+        # fixture is the host measurement used by the Issue #8 baseline; the
+        # explicit reserve assertion prevents a future limit from consuming
+        # all measured RAM even if the 60 GiB policy is relaxed.
+        host_physical = 121 * 1024**3
+        host_reserve = 8 * 1024**3
+        safe_ceiling = 60 * 1024**3
         peak_floor = int(27.5 * 1024**3)
         for key in ("MemoryHigh", "MemoryMax", "MemoryLimit"):
             for value in service.get(key, []):
                 actual = systemd_bytes(value)
                 self.assertIsNotNone(actual, f"{key} must be finite: {value}")
-                self.assertGreaterEqual(actual, ram_floor,
-                                        f"{key} caps below RAM baseline: {value}")
+                self.assertGreaterEqual(actual, peak_floor,
+                                        f"{key} rejects the measured peak: {value}")
+                self.assertLess(actual, safe_ceiling,
+                                f"{key} is not below the 60 GiB host-safe ceiling: {value}")
+                self.assertLessEqual(actual, host_physical - host_reserve,
+                                     f"{key} leaves less than 8 GiB host reserve: {value}")
         hard_caps = service.get("MemoryMax", [])
         self.assertTrue(hard_caps, "service needs an explicit MemoryMax ceiling")
         self.assertTrue(any(systemd_bytes(value) >= peak_floor for value in hard_caps),
@@ -105,8 +113,8 @@ class Issue8SystemdService(unittest.TestCase):
             actual = systemd_bytes(value)
             self.assertIsNotNone(actual, "swap must not be unlimited")
             self.assertGreater(actual, 0, "swap ceiling must retain a finite emergency reserve")
-            self.assertLess(actual, 121 * 1024**3,
-                            "swap ceiling must prevent swapping across the full host")
+            self.assertLessEqual(actual, 8 * 1024**3,
+                                 "swap ceiling is too large for sustained-swap protection")
 
         output = " ".join(service.get("StandardOutput", []) + service.get("StandardError", []))
         self.assertIn("journal", output, "service logs must remain visible in the journal")
@@ -134,7 +142,7 @@ class Issue8SystemdService(unittest.TestCase):
         fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
         return bindir, log
 
-    def run_lifecycle(self, script, root, *args):
+    def run_lifecycle(self, script, root, *args, extra_env=None):
         env = os.environ.copy()
         bindir, _ = self.fake_systemctl(root)
         # Spaces and shell punctuation exercise path escaping without ever
@@ -148,6 +156,8 @@ class Issue8SystemdService(unittest.TestCase):
         env.update({"HOME": str(home), "XDG_CONFIG_HOME": str(xdg),
                     "XDG_DATA_HOME": str(data),
                     "PATH": f"{bindir}:{env['PATH']}"})
+        if extra_env:
+            env.update(extra_env)
         return subprocess.run([str(script), *args], cwd=ROOT, env=env,
                               text=True, capture_output=True, timeout=5)
 
@@ -156,6 +166,75 @@ class Issue8SystemdService(unittest.TestCase):
         unit = xdg / "systemd" / "user" / SERVICE
         envs = list(xdg.rglob("*.env"))
         return unit, envs
+
+    def write_race_hook(self, root):
+        """Create the explicitly test-gated mutation hook used by race tests.
+
+        Production must require LOCAL_AI_TEST_MODE=1 before invoking
+        LOCAL_AI_TEST_HOOK, and must pass a phase plus the final destination
+        path.  The hook mutates synchronously, so tests do not depend on
+        scheduler timing or a competing process winning a race.
+        """
+        hook = root / "issue8-race-hook.py"
+        log = root / "issue8-race-hook.log"
+        hook.write_text(
+            "#!/usr/bin/env python3\n"
+            "import os\n"
+            "import sys\n"
+            "from pathlib import Path\n"
+            "phase, raw_target = sys.argv[1:3]\n"
+            "target = Path(raw_target).absolute()\n"
+            "log = Path(os.environ['ISSUE8_RACE_LOG'])\n"
+            "with log.open('a') as stream:\n"
+            "    stream.write(phase + ' ' + str(target) + '\\n')\n"
+            "expected = os.environ.get('ISSUE8_RACE_TARGET')\n"
+            "if expected and target != Path(expected).absolute():\n"
+            "    raise SystemExit(0)\n"
+            "if phase != os.environ.get('ISSUE8_RACE_PHASE'):\n"
+            "    raise SystemExit(0)\n"
+            "action = os.environ['ISSUE8_RACE_ACTION']\n"
+            "if action == 'swap-parent':\n"
+            "    if os.environ.get('ISSUE8_RACE_REQUIRE_DIRFD') == '1':\n"
+            "        fd_dir = Path('/proc') / str(os.getppid()) / 'fd'\n"
+            "        opened = []\n"
+            "        for fd in fd_dir.iterdir():\n"
+            "            try:\n"
+            "                opened.append(os.readlink(fd))\n"
+            "            except OSError:\n"
+            "                pass\n"
+            "        if str(target.parent) not in opened:\n"
+            "            raise SystemExit('parent directory was not held open')\n"
+            "    outside = Path(os.environ['ISSUE8_RACE_OUTSIDE'])\n"
+            "    outside.mkdir(parents=True, exist_ok=True)\n"
+            "    (outside / 'sentinel').write_text('outside sentinel\\n')\n"
+            "    held = target.parent.with_name(target.parent.name + '.held')\n"
+            "    target.parent.rename(held)\n"
+            "    target.parent.symlink_to(outside, target_is_directory=True)\n"
+            "elif action == 'swap-destination':\n"
+            "    replacement = target.with_name(target.name + '.unowned')\n"
+            "    replacement.write_text('unowned race replacement\\n')\n"
+            "    os.replace(replacement, target)\n"
+            "else:\n"
+            "    raise SystemExit('unknown race action')\n"
+        )
+        hook.chmod(hook.stat().st_mode | stat.S_IXUSR)
+        return hook, log
+
+    def race_env(self, root, *, phase, action, target, outside=None):
+        hook, log = self.write_race_hook(root)
+        environment = {
+            "LOCAL_AI_TEST_MODE": "1",
+            "LOCAL_AI_TEST_HOOK": str(hook),
+            "ISSUE8_RACE_LOG": str(log),
+            "ISSUE8_RACE_PHASE": phase,
+            "ISSUE8_RACE_ACTION": action,
+            "ISSUE8_RACE_TARGET": str(target),
+        }
+        if outside is not None:
+            environment["ISSUE8_RACE_OUTSIDE"] = str(outside)
+        if action == "swap-parent":
+            environment["ISSUE8_RACE_REQUIRE_DIRFD"] = "1"
+        return environment, log
 
     def test_install_is_bounded_idempotent_and_uses_safe_escaped_environment(self):
         self.assertTrue(INSTALL.is_file(), "missing service installer")
@@ -408,6 +487,121 @@ class Issue8SystemdService(unittest.TestCase):
                                         text=True, capture_output=True, timeout=5)
                 self.assertNotEqual(result.returncode, 0,
                                     f"accepted non-normalized launcher override {override!r}")
+
+    def test_race_hook_requires_explicit_test_mode(self):
+        with tempfile.TemporaryDirectory(prefix="issue8-hook-gate-") as tmp:
+            root = Path(tmp)
+            hook, log = self.write_race_hook(root)
+            unit = root / "xdg config;literal" / "systemd" / "user" / SERVICE
+            result = self.run_lifecycle(
+                INSTALL, root,
+                extra_env={"LOCAL_AI_TEST_MODE": "0",
+                           "LOCAL_AI_TEST_HOOK": str(hook),
+                           "ISSUE8_RACE_LOG": str(log),
+                           "ISSUE8_RACE_PHASE": "before-replace",
+                           "ISSUE8_RACE_ACTION": "swap-destination",
+                           "ISSUE8_RACE_TARGET": str(unit)},
+            )
+            self.assertNotEqual(result.returncode, 0,
+                                "race hook was accepted without explicit test mode")
+            self.assertFalse(log.exists(), "test hook ran outside explicit test mode")
+
+    def test_installer_refuses_swapped_intermediate_ancestor_without_outside_write(self):
+        with tempfile.TemporaryDirectory(prefix="issue8-install-ancestor-race-") as tmp:
+            root = Path(tmp)
+            installed = self.run_lifecycle(INSTALL, root)
+            self.assertEqual(installed.returncode, 0, installed.stderr)
+            unit, _envs = self.installed_paths(root)
+            outside = root / "outside"
+            outside.mkdir()
+            (outside / "sentinel").write_text("outside sentinel\\n")
+            before = {p.relative_to(outside).as_posix(): p.read_bytes()
+                      for p in outside.rglob("*") if p.is_file()}
+            environment, log = self.race_env(
+                root, phase="before-replace", action="swap-parent",
+                target=unit, outside=outside,
+            )
+            result = self.run_lifecycle(INSTALL, root, extra_env=environment)
+            self.assertNotEqual(result.returncode, 0,
+                                "installer accepted a swapped intermediate ancestor")
+            self.assertIn(f"before-replace {unit.absolute()}", log.read_text().splitlines())
+            after = {p.relative_to(outside).as_posix(): p.read_bytes()
+                     for p in outside.rglob("*") if p.is_file()}
+            self.assertEqual(after, before, "installer wrote through the swapped ancestor")
+
+    def test_uninstaller_refuses_swapped_intermediate_ancestor_without_outside_remove(self):
+        with tempfile.TemporaryDirectory(prefix="issue8-uninstall-ancestor-race-") as tmp:
+            root = Path(tmp)
+            installed = self.run_lifecycle(INSTALL, root)
+            self.assertEqual(installed.returncode, 0, installed.stderr)
+            unit, _envs = self.installed_paths(root)
+            outside = root / "outside"
+            outside.mkdir()
+            (outside / "sentinel").write_text("outside sentinel\\n")
+            before = {p.relative_to(outside).as_posix(): p.read_bytes()
+                      for p in outside.rglob("*") if p.is_file()}
+            environment, log = self.race_env(
+                root, phase="before-remove", action="swap-parent",
+                target=unit, outside=outside,
+            )
+            result = self.run_lifecycle(UNINSTALL, root, extra_env=environment)
+            self.assertNotEqual(result.returncode, 0,
+                                "uninstaller accepted a swapped intermediate ancestor")
+            self.assertIn(f"before-remove {unit.absolute()}", log.read_text().splitlines())
+            after = {p.relative_to(outside).as_posix(): p.read_bytes()
+                     for p in outside.rglob("*") if p.is_file()}
+            self.assertEqual(after, before, "uninstaller removed through the swapped ancestor")
+
+    def test_installer_revalidates_destination_inode_and_hash_before_replace(self):
+        with tempfile.TemporaryDirectory(prefix="issue8-install-destination-race-") as tmp:
+            root = Path(tmp)
+            installed = self.run_lifecycle(INSTALL, root)
+            self.assertEqual(installed.returncode, 0, installed.stderr)
+            unit, _envs = self.installed_paths(root)
+            environment, log = self.race_env(
+                root, phase="before-replace", action="swap-destination", target=unit,
+            )
+            result = self.run_lifecycle(INSTALL, root, extra_env=environment)
+            self.assertNotEqual(result.returncode, 0,
+                                "installer replaced a destination changed after validation")
+            self.assertIn(f"before-replace {unit.absolute()}", log.read_text().splitlines())
+            self.assertEqual(unit.read_text(), "unowned race replacement\\n",
+                             "installer overwrote the raced unowned destination")
+
+    def test_uninstaller_revalidates_destination_inode_and_hash_before_remove(self):
+        with tempfile.TemporaryDirectory(prefix="issue8-uninstall-destination-race-") as tmp:
+            root = Path(tmp)
+            installed = self.run_lifecycle(INSTALL, root)
+            self.assertEqual(installed.returncode, 0, installed.stderr)
+            unit, _envs = self.installed_paths(root)
+            environment, log = self.race_env(
+                root, phase="before-remove", action="swap-destination", target=unit,
+            )
+            result = self.run_lifecycle(UNINSTALL, root, extra_env=environment)
+            self.assertNotEqual(result.returncode, 0,
+                                "uninstaller removed a destination changed after validation")
+            self.assertIn(f"before-remove {unit.absolute()}", log.read_text().splitlines())
+            self.assertEqual(unit.read_text(), "unowned race replacement\\n",
+                             "uninstaller removed the raced unowned destination")
+
+    def test_uninstaller_revalidates_ownership_before_stop_and_disable(self):
+        with tempfile.TemporaryDirectory(prefix="issue8-stop-race-") as tmp:
+            root = Path(tmp)
+            installed = self.run_lifecycle(INSTALL, root)
+            self.assertEqual(installed.returncode, 0, installed.stderr)
+            unit, _envs = self.installed_paths(root)
+            environment, log = self.race_env(
+                root, phase="before-stop-disable", action="swap-destination", target=unit,
+            )
+            result = self.run_lifecycle(UNINSTALL, root, extra_env=environment)
+            self.assertNotEqual(result.returncode, 0,
+                                "uninstaller controlled a service after ownership changed")
+            self.assertIn(f"before-stop-disable {unit.absolute()}", log.read_text().splitlines())
+            self.assertEqual(unit.read_text(), "unowned race replacement\\n")
+            systemctl_log = root / "systemctl.jsonl"
+            calls = systemctl_log.read_text() if systemctl_log.exists() else ""
+            self.assertNotRegex(calls, r'"stop"|"disable"',
+                                "uninstaller stopped or disabled an unowned service")
 
     def test_operator_documentation_covers_complete_lifecycle(self):
         self.assertTrue(DOC.is_file(), "missing Issue #8 operator documentation")
