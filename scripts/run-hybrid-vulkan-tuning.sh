@@ -287,6 +287,10 @@ def parse_run(raw, parameters, context, prompt, safety, command, supplied=None):
                 "vram_capacity_mib": metrics.get("vram_capacity_mib"), "offload_evidence": offload,
                 "observed_command": safe_text(command), "provenance": {"host": "/proc", "gpu": "/sys/class/drm", "cli": "bounded-live-capture"},
                 "device_observed": device_line, "context_observed": context_ok}
+    # Retain only recognized, non-sensitive compatibility diagnostics. Never
+    # place arbitrary stderr in the aggregate evidence.
+    if re.search(r"quantized V cache requires flash_attn to be enabled", combined, re.I):
+        evidence["failure_reason"] = "quantized V cache requires flash_attn to be enabled"
     thresholds = safety
     safe = (isinstance(metrics.get("vram_capacity_mib"), (int, float)) and isinstance(metrics.get("peak_vram_mib"), (int, float))
             and metrics["peak_vram_mib"] <= metrics["vram_capacity_mib"] - thresholds["minimum_vram_free_mib"]
@@ -460,7 +464,8 @@ def main():
                                        "lifecycle": {"started": True, "bounded": True, "finished": True}, "command": command, "result": attempt})
             if not parsed["quality_pass"]: break
         if len(attempts) != 3 or not all(a["quality"]["passed"] for a in attempts):
-            status = "fail"
+            status = ("incompatible" if attempts[-1].get("evidence", {}).get("failure_reason") ==
+                      "quantized V cache requires flash_attn to be enabled" else "fail")
         else:
             metric_keys = ("prompt_eval_ms", "generation_eval_ms", "prompt_tokens_per_second", "generation_tokens_per_second")
             metrics = {k: sum(a["metrics"][k] for a in attempts) / len(attempts) for k in metric_keys}

@@ -278,9 +278,10 @@ exact_terminal = bool(expected_indexes) and not any(
     line and not terminal_noise.match(line) for line in stdout_lines[expected_indexes[-1] + 1:]
 )
 cleaned_final = clean(final_response)
-expected_match = (not expected_clean and bool(cleaned_final)) or (bool(expected_clean) and exact_terminal)
-completion = expected_clean if expected_clean and expected_match else cleaned_final
-response_chunks = [expected_clean] if expected_clean and expected_match else [clean(x.strip()) for x in final_response.splitlines() if x.strip()]
+expected_match = ((not expected_clean and bool(cleaned_final)) or
+                  (bool(expected_clean) and exact_terminal and cleaned_final == expected_clean))
+completion = cleaned_final
+response_chunks = [clean(x.strip()) for x in final_response.splitlines() if x.strip()]
 # Preserve observed FIFO read boundaries and timestamps instead of claiming
 # that post-processed output lines are transport chunks.
 try: chunk_evidence = json.loads(pathlib.Path(os.environ['STDOUT_EVIDENCE_FILE']).read_text())

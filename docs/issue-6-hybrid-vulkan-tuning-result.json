@@ -257,7 +257,8 @@
           "attempt_id": "677363e71fd9489e2775215edf06623bd1a1105ff4d096614c6b386ff99d5f7f.attempt-01",
           "evidence": {
             "context_observed": false,
-            "device_observed": "0.00.012.235 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 6900 XT (RADV NAVI21) (16368 MiB, 15406 MiB free)",
+            "device_observed": "0.00.012.403 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 6900 XT (RADV NAVI21) (16368 MiB, 15404 MiB free)",
+            "failure_reason": "quantized V cache requires flash_attn to be enabled",
             "measurement_source": "live",
             "observed_command": "llama-cli --ctx-size 32768 --device Vulkan0 --gpu-layers 16 --flash-attn off --batch-size 256 --ubatch-size 128 --cache-type-k q8_0 --cache-type-v q8_0 --prompt-sha256 ac7d192329eadcd3e0a67996567e3f0608a1f627a44fabde257b5472c1c5c9df --prompt-tokens 4 --n-predict 128",
             "offload_evidence": true,
@@ -275,8 +276,8 @@
             "generation_eval_ms": null,
             "generation_tokens": null,
             "generation_tokens_per_second": null,
-            "min_mem_available_mib": 55693,
-            "peak_vram_mib": 8032,
+            "min_mem_available_mib": 55703,
+            "peak_vram_mib": 8034,
             "prompt_eval_ms": null,
             "prompt_tokens": null,
             "prompt_tokens_per_second": null,
@@ -297,9 +298,10 @@
       ],
       "config_id": "3bc4787e59d7511554cf0698f20669b3aa7b5efa07f19e9cf790bf401eee4724",
       "evidence": {
-        "attempts_digest": "c4514e62395d5e57f9f6aa926d8d0073eca5b63cd4add141cbf9cf6d3dac869d",
+        "attempts_digest": "828224413eb9d6c8ddf59f3cc58e3c10eac636506bea2337593bf7f3987d5987",
         "context_observed": false,
-        "device_observed": "0.00.012.235 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 6900 XT (RADV NAVI21) (16368 MiB, 15406 MiB free)",
+        "device_observed": "0.00.012.403 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 6900 XT (RADV NAVI21) (16368 MiB, 15404 MiB free)",
+        "failure_reason": "quantized V cache requires flash_attn to be enabled",
         "measurement_source": "live",
         "observed_command": "llama-cli --ctx-size 32768 --device Vulkan0 --gpu-layers 16 --flash-attn off --batch-size 256 --ubatch-size 128 --cache-type-k q8_0 --cache-type-v q8_0 --prompt-sha256 ac7d192329eadcd3e0a67996567e3f0608a1f627a44fabde257b5472c1c5c9df --prompt-tokens 4 --n-predict 128",
         "offload_evidence": true,
@@ -320,12 +322,12 @@
           "passed": false,
           "timing_confirmed": false
         },
-        "row_status": "fail",
+        "row_status": "incompatible",
         "vram_capacity_mib": 16368,
         "vram_card": "card1",
         "vram_pci_id": "1002:73BF"
       },
-      "evidence_id": "eae283e69ce975e34df2976f87ac5531399e9399632f6946372c95ddac142ea7",
+      "evidence_id": "744eac111baea69df7e3310090d669ebc1b6d80e6f9fe791d838440c9441a38b",
       "lifecycle": {
         "bounded": true,
         "finished": true,
@@ -352,7 +354,7 @@
         "timing_confirmed": false
       },
       "schema_version": "hybrid-vulkan-tuning-v1",
-      "status": "fail",
+      "status": "incompatible",
       "tuple_id": "677363e71fd9489e2775215edf06623bd1a1105ff4d096614c6b386ff99d5f7f"
     },
     {
@@ -576,7 +578,8 @@
           "attempt_id": "d30835598524d058ab12c5fd6c0fa371c0a1d66f4ff6e21106329b99c78c567e.attempt-01",
           "evidence": {
             "context_observed": false,
-            "device_observed": "0.00.012.399 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 6900 XT (RADV NAVI21) (16368 MiB, 15406 MiB free)",
+            "device_observed": "0.00.013.438 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 6900 XT (RADV NAVI21) (16368 MiB, 15406 MiB free)",
+            "failure_reason": "quantized V cache requires flash_attn to be enabled",
             "measurement_source": "live",
             "observed_command": "llama-cli --ctx-size 32768 --device Vulkan0 --gpu-layers 20 --flash-attn off --batch-size 256 --ubatch-size 128 --cache-type-k q8_0 --cache-type-v q8_0 --prompt-sha256 ac7d192329eadcd3e0a67996567e3f0608a1f627a44fabde257b5472c1c5c9df --prompt-tokens 4 --n-predict 128",
             "offload_evidence": true,
@@ -594,7 +597,7 @@
             "generation_eval_ms": null,
             "generation_tokens": null,
             "generation_tokens_per_second": null,
-            "min_mem_available_mib": 55596,
+            "min_mem_available_mib": 55692,
             "peak_vram_mib": 9575,
             "prompt_eval_ms": null,
             "prompt_tokens": null,
@@ -616,9 +619,10 @@
       ],
       "config_id": "3bc4787e59d7511554cf0698f20669b3aa7b5efa07f19e9cf790bf401eee4724",
       "evidence": {
-        "attempts_digest": "934d1f07a717d27185d0b305326a883891fc66033fe76ccd440ac64fc62e2f3f",
+        "attempts_digest": "97cfeff7896921da4135d73b1b2ba95045fb4bc5ee41debef0766955222ae7c0",
         "context_observed": false,
-        "device_observed": "0.00.012.399 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 6900 XT (RADV NAVI21) (16368 MiB, 15406 MiB free)",
+        "device_observed": "0.00.013.438 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 6900 XT (RADV NAVI21) (16368 MiB, 15406 MiB free)",
+        "failure_reason": "quantized V cache requires flash_attn to be enabled",
         "measurement_source": "live",
         "observed_command": "llama-cli --ctx-size 32768 --device Vulkan0 --gpu-layers 20 --flash-attn off --batch-size 256 --ubatch-size 128 --cache-type-k q8_0 --cache-type-v q8_0 --prompt-sha256 ac7d192329eadcd3e0a67996567e3f0608a1f627a44fabde257b5472c1c5c9df --prompt-tokens 4 --n-predict 128",
         "offload_evidence": true,
@@ -639,12 +643,12 @@
           "passed": false,
           "timing_confirmed": false
         },
-        "row_status": "fail",
+        "row_status": "incompatible",
         "vram_capacity_mib": 16368,
         "vram_card": "card1",
         "vram_pci_id": "1002:73BF"
       },
-      "evidence_id": "698b7ca92dc7da83f4a63e9a1b7bb1bba4b52ea4cf4f103ff6b7d4d0c9920c5f",
+      "evidence_id": "abd363f8859461be9cbb19de128084069e01a51d671b9ebbe098affbc392ca3f",
       "lifecycle": {
         "bounded": true,
         "finished": true,
@@ -671,7 +675,7 @@
         "timing_confirmed": false
       },
       "schema_version": "hybrid-vulkan-tuning-v1",
-      "status": "fail",
+      "status": "incompatible",
       "tuple_id": "d30835598524d058ab12c5fd6c0fa371c0a1d66f4ff6e21106329b99c78c567e"
     }
   ],
