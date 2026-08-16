@@ -30,9 +30,8 @@ PRESETS = ROOT / "config" / "router-presets.json"
 class B10446Endpoint:
     """Small router fixture with the real response/status shape."""
 
-    def __init__(self, *, mode="normal", model_id="Qwen3.5-27B-Q8_0", strict=True):
+    def __init__(self, *, mode="normal", model_id="Qwen3.5-27B-Q8_0"):
         self.mode = mode
-        self.strict = strict
         self.model_id = model_id
         self.requests = []
         self.load_polls = 0
@@ -60,7 +59,7 @@ class B10446Endpoint:
                     return
                 if owner.state == "loading":
                     owner.load_polls += 1
-                    status = "loading" if owner.mode != "load-timeout" or owner.load_polls < 4 else "loading"
+                    status = "loading"
                     if owner.mode != "load-timeout" and owner.load_polls >= 2:
                         status = "loaded"
                 elif owner.state == "unloading":
@@ -82,10 +81,7 @@ class B10446Endpoint:
                 # b10446 accepts the extensionless ID and returns only this
                 # success shape.  Any compatibility payload is a regression.
                 expected = {"model": owner.model_id}
-                accepted = {json.dumps(expected)}
-                if not owner.strict:
-                    accepted.add(json.dumps({"model": owner.model_id + ".gguf"}))
-                if json.dumps(body) not in accepted:
+                if json.dumps(body) != json.dumps(expected):
                     self.reply({"success": False}, 400)
                     return
                 owner.state = "loading" if self.path == "/models/load" else "unloading"
@@ -340,11 +336,11 @@ class Issue7ReviewRegressions(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="issue7-lifecycle-timeout-") as tmp:
             root = Path(tmp)
             manifest, _model = self.manifest(root, "Qwen3.5-27B-Q8_0.gguf")
-            with B10446Endpoint(mode="load-timeout", strict=False) as endpoint:
+            with B10446Endpoint(mode="load-timeout") as endpoint:
                 result = self.run_helper("load", manifest, root, endpoint.url)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertGreaterEqual(endpoint.load_polls, 2)
-            with B10446Endpoint(mode="unload-timeout", strict=False) as endpoint:
+            with B10446Endpoint(mode="unload-timeout") as endpoint:
                 result = self.run_helper("unload", manifest, root, endpoint.url)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertGreaterEqual(endpoint.unload_polls, 2)
@@ -466,7 +462,7 @@ class Issue7ReviewRegressions(unittest.TestCase):
             self.assertFalse((root / "server.log").exists(),
                              "newline filename reached the router process")
 
-    def test_runtime_preset_is_unique_private_and_existing_race_targets_are_rejected(self):
+    def test_runtime_preset_is_unique_private_and_legacy_target_is_untouched(self):
         with tempfile.TemporaryDirectory(prefix="issue7-runtime-") as tmp:
             root = Path(tmp); runtime = root / "runtime"; runtime.mkdir()
             process, _port, log, runtime = self.start_router(root, runtime=runtime)
@@ -482,13 +478,13 @@ class Issue7ReviewRegressions(unittest.TestCase):
 
             outside = root / "outside.ini"; outside.write_text("sentinel")
             (runtime / "router-presets.ini").symlink_to(outside)
-            process = subprocess.run(
-                [str(LAUNCHER), "--server", str(self.fake_server(root)), "--config", str(self.config(root)),
-                 "--presets", str(PRESETS), "--models-dir", str(root / "models"),
-                 "--runtime-dir", str(runtime)],
-                cwd=ROOT, text=True, capture_output=True, timeout=3,
-            )
-            self.assertNotEqual(process.returncode, 0)
+            process, _port, log, _runtime = self.start_router(root, runtime=runtime)
+            try:
+                third_args = json.loads(log.read_text())["args"]
+                third = Path(third_args[third_args.index("--models-preset") + 1])
+                self.assertNotEqual(third, runtime / "router-presets.ini")
+            finally:
+                self.stop_router(process)
             self.assertEqual(outside.read_text(), "sentinel")
 
 
