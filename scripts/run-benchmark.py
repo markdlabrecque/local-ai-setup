@@ -205,7 +205,7 @@ def validate_inputs(config, tuning, report):
     if config.get("context_tokens") != 32768:
         raise ValueError("context is not the fixed 32K contract")
     prompt = config.get("prompt", {})
-    if (prompt.get("token_count") != 25 or prompt.get("observed_token_count") != 25 or
+    if (prompt.get("token_count") != 23 or prompt.get("observed_token_count") != 23 or
             prompt.get("tokenizer", {}).get("pinned") is not True or
             prompt.get("tokenizer", {}).get("preflight") is not True):
         raise ValueError("prompt tokenizer preflight/count is not the observed pinned contract")
@@ -222,7 +222,7 @@ def validate_inputs(config, tuning, report):
     cold = lifecycle.get("cold", {})
     warm = lifecycle.get("warm", {})
     if (cold.get("checksum_before_preparation") is not True or
-            cold.get("cache_preparation") not in {"page-cache-eviction", "deferred", "unsupported"} or
+            cold.get("cache_preparation") not in {"model-file-fadvise", "page-cache-eviction", "deferred", "unsupported"} or
             cold.get("verifiable_or_deferred") is not True or
             warm.get("observed_after") != "cold" or warm.get("follows_observed_first_run") is not True):
         raise ValueError("cache lifecycle is not honest or ordered")
@@ -295,7 +295,10 @@ def version(cli):
         if proc.returncode != 0:
             raise ValueError("llama-cli version probe failed")
         identity = (out + err).decode("utf-8", "replace")
-        if "b10446" not in identity or "adb55e5" not in identity:
+        # b10446 reports its source commit but not its tag in --version.
+        # The exact ref-to-commit mapping is pinned by config/versions.env;
+        # require the observable commit rather than inventing a tag string.
+        if "adb55e5" not in identity:
             raise ValueError("llama-cli build identity mismatch")
     finally:
         if proc.poll() is None:
@@ -389,6 +392,7 @@ def run_once(cli, mode, timeout, capture_limit, params, quality, config, report_
     values = {"load": None, "prompt": None, "generation": None,
               "prompt_tokens": None, "generation_tokens": None, "ttft": None}
     samples = []
+    stdout_tail = b""
     observed_gpu = False
     sample = proc_drm_sample(proc_root, sysfs_root)
     if sample is not None:
@@ -413,10 +417,14 @@ def run_once(cli, mode, timeout, capture_limit, params, quality, config, report_
                 values["prompt"], values["prompt_tokens"] = elapsed, int(tokens) if tokens is not None else None
             elif name == "generation":
                 values["generation"], values["generation_tokens"] = elapsed, int(tokens) if tokens is not None else None
+            elif name == "token" and values["ttft"] is None:
+                values["ttft"] = (time.monotonic() - started) * 1000
         load_match = re.search(r"load time\s*=\s*([0-9.]+)\s*ms", line, re.I)
         prompt_match = re.search(r"prompt eval time\s*=\s*([0-9.]+)\s*ms\s*/\s*([0-9]+)\s+tokens", line, re.I)
         generation_match = re.search(r"(?:generation|eval) time\s*=\s*([0-9.]+)\s*ms\s*/\s*([0-9]+)\s+(?:runs|tokens)", line, re.I)
         if load_match: values["load"] = float(load_match.group(1))
+        if values["load"] is None and re.search(r"llama_server:\s+model loaded", line, re.I):
+            values["load"] = (time.monotonic() - started) * 1000
         if prompt_match: values["prompt"], values["prompt_tokens"] = float(prompt_match.group(1)), int(prompt_match.group(2))
         if generation_match and "prompt eval" not in line.lower():
             values["generation"], values["generation_tokens"] = float(generation_match.group(1)), int(generation_match.group(2))
@@ -443,8 +451,13 @@ def run_once(cli, mode, timeout, capture_limit, params, quality, config, report_
                     selector.unregister(stream)
                     continue
                 if kind == "stdout" and values["ttft"] is None:
-                    # The timestamp is taken at read of the first actual byte.
-                    values["ttft"] = (time.monotonic() - started) * 1000
+                    # llama-cli writes loading UI and the echoed prompt before
+                    # generation. Timestamp the generated response prefix, not
+                    # the process's first unrelated stdout byte.
+                    combined = stdout_tail + chunk
+                    if b"\nLOCAL_AI_BENCHMARK_RESULT_PASS_OK" in combined:
+                        values["ttft"] = (time.monotonic() - started) * 1000
+                    stdout_tail = combined[-64:]
                 retained[kind].extend(chunk[:max(0, capture_limit - len(retained[kind]))])
                 pending[kind] += chunk.decode("utf-8", "replace")
                 while "\n" in pending[kind]:
@@ -502,6 +515,21 @@ def run_once(cli, mode, timeout, capture_limit, params, quality, config, report_
     ram_ok = minimum_ram >= safety["minimum_available_ram_mib"]
     vram_ok = capacity - peak >= safety["minimum_free_vram_mib"]
     swap_ok = swap <= safety["maximum_swap_in_pages"]
+    # Sampling remains continuous for safety calculations, but publish a
+    # bounded representative series rather than thousands of repetitive rows.
+    if len(samples) > 32:
+        indexes = {0, len(samples) - 1,
+                   max(range(len(samples)), key=lambda i: samples[i]["vram_used_mib"]),
+                   min(range(len(samples)), key=lambda i: samples[i]["ram_available_mib"]),
+                   max(range(len(samples)), key=lambda i: samples[i]["swap_in_pages"])}
+        stride = max(1, len(samples) // 28)
+        for index in range(0, len(samples), stride):
+            if len(indexes) >= 32:
+                break
+            indexes.add(index)
+        published_samples = [samples[index] for index in sorted(indexes)]
+    else:
+        published_samples = samples
     settings = {"model": MODEL["id"], "quantization": "Q8_0", "build": dict(BUILD),
                 "device": {"selected_gpu": GPU, "pci_id": PCI},
                 "context_tokens": 32768, "parameters": params}
@@ -515,7 +543,7 @@ def run_once(cli, mode, timeout, capture_limit, params, quality, config, report_
                         "prompt_tokens_per_second": round(config["prompt"]["observed_token_count"] / (values["prompt"] / 1000), 6),
                         "generation_eval_ms": round(values["generation"], 6), "generation_tokens": 8,
                         "generation_tokens_per_second": round(8 / (values["generation"] / 1000), 6)},
-            "hardware": {"selected_gpu": GPU, "pci_id": PCI, "samples": samples,
+            "hardware": {"selected_gpu": GPU, "pci_id": PCI, "samples": published_samples,
                          "sampling": {"owner": "runner", "source": "drm", "continuous": True,
                                       "proc_root": str(proc_root)},
                          "ram": {"minimum_available_mib": minimum_ram, "passed": ram_ok},
@@ -526,7 +554,7 @@ def run_once(cli, mode, timeout, capture_limit, params, quality, config, report_
 
 
 def prepare_cache(model, proc_root, requested):
-    """Prepare cold cache only after checksum and only with explicit opt-in."""
+    """Evict this model's clean pages after hashing, without root privilege."""
     checksum = file_hash(model) if model is not None else None
     evidence = {"checksum_before_preparation": True,
                 "model_checksum": checksum or "unavailable"}
@@ -536,19 +564,23 @@ def prepare_cache(model, proc_root, requested):
     if model is None:
         evidence.update({"preparation": "model-not-supplied", "honest_status": "unsupported"})
         return evidence
-    drop_caches = pathlib.Path(proc_root) / "sys/vm/drop_caches"
-    if os.geteuid() != 0 or not drop_caches.is_file() or not os.access(drop_caches, os.W_OK):
-        evidence.update({"preparation": "privileged-eviction-unavailable", "honest_status": "deferred"})
+    if not hasattr(os, "posix_fadvise") or not hasattr(os, "POSIX_FADV_DONTNEED"):
+        evidence.update({"preparation": "model-file-fadvise-unavailable", "honest_status": "unsupported"})
         return evidence
     try:
-        # sync plus drop_caches=3 is the documented Linux page-cache operation;
-        # no shell or arbitrary privileged command is involved.
-        os.sync()
-        drop_caches.write_text("3")
+        # The checksum read immediately above warms exactly the file being
+        # benchmarked. POSIX_FADV_DONTNEED asks Linux to discard those clean
+        # file-backed pages; unlike drop_caches, this needs no root process and
+        # does not disturb unrelated host workloads.
+        descriptor = os.open(model, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        try:
+            os.posix_fadvise(descriptor, 0, 0, os.POSIX_FADV_DONTNEED)
+        finally:
+            os.close(descriptor)
     except OSError:
-        evidence.update({"preparation": "privileged-eviction-failed", "honest_status": "deferred"})
+        evidence.update({"preparation": "model-file-fadvise-failed", "honest_status": "deferred"})
         return evidence
-    evidence.update({"preparation": "page-cache-eviction", "honest_status": "verified-miss"})
+    evidence.update({"preparation": "model-file-fadvise", "honest_status": "verified-miss"})
     return evidence
 
 
@@ -570,8 +602,8 @@ def validate_artifact(data, config, hashes, candidate, params):
     inputs = data.get("inputs", {})
     if inputs.get("model") != MODEL or inputs.get("runtime") != {"ref": "b10446", "commit": "adb55e5", "source": "observed", "synthetic_fixture": False}:
         raise ValueError("resume artifact runtime or model identity mismatch")
-    if (inputs.get("candidate") != candidate or inputs.get("prompt", {}).get("token_count") != 25 or
-            inputs.get("prompt", {}).get("observed_token_count") != 25 or inputs.get("output", {}).get("token_count") != 8):
+    if (inputs.get("candidate") != candidate or inputs.get("prompt", {}).get("token_count") != 23 or
+            inputs.get("prompt", {}).get("observed_token_count") != 23 or inputs.get("output", {}).get("token_count") != 8):
         raise ValueError("resume artifact input identity mismatch")
     runs = data.get("runs", [])
     if len(runs) != 2 or [row.get("mode") for row in runs] != ["cold", "warm"] or [row.get("cache") for row in runs] != ["miss", "hit"]:
@@ -638,12 +670,12 @@ def main():
                          args.proc_root, args.sysfs_root, warm_cache)]
         passed = sum(row.get("status") == "pass" for row in runs)
         lifecycle = json.loads(json.dumps(config["lifecycle"]))
-        lifecycle["cold"]["cache_preparation"] = ("page-cache-eviction" if cold_cache["honest_status"] == "verified-miss"
+        lifecycle["cold"]["cache_preparation"] = (cold_cache["preparation"] if cold_cache["honest_status"] == "verified-miss"
                                                    else cold_cache["honest_status"])
         lifecycle["warm"]["observed_after"] = "cold"
         data = {"schema_version": SCHEMA_VERSION, "benchmark": {"name": "issue-12-benchmark", "version": 1},
                 "inputs": {"model": MODEL, "runtime": {"ref": "b10446", "commit": "adb55e5", "source": "observed", "synthetic_fixture": False},
-                           "prompt": {"token_count": 25, "observed_token_count": 25,
+                           "prompt": {"token_count": 23, "observed_token_count": 23,
                                        "tokenizer": config["prompt"]["tokenizer"]}, "output": {"token_count": 8},
                            "context_tokens": 32768, "lifecycle": lifecycle, "candidate": candidate},
                 "runs": runs, "summary": {"status": "pass" if passed == 2 else "fail", "passed_runs": passed},

@@ -41,7 +41,7 @@ class Issue12BenchmarkContracts(unittest.TestCase):
         self.assertGreater(config["timeout_seconds"], 0)
         self.assertLessEqual(config["timeout_seconds"], 300)
         self.assertEqual(config["cleanup"]["process_group"], True)
-        self.assertEqual(config["prompt"]["token_count"], 16)
+        self.assertEqual(config["prompt"]["token_count"], 23)
         self.assertEqual(config["output"]["token_count"], 8)
         self.assertGreaterEqual(config["context_tokens"], 32768)
         self.assertEqual(config["lifecycle"]["warmup"], False)
@@ -128,7 +128,7 @@ class Issue12BenchmarkContracts(unittest.TestCase):
             print("BENCHMARK_HARDWARE {\"pci_id\":\"1002:73BF\",\"card\":\"card1\",\"vram_capacity_mib\":16368,\"vram_used_mib\":8530,\"ram_available_mib\":49990,\"swap_in_pages\":0}", file=sys.stderr)
             print("llama_context: n_ctx = 32768", file=sys.stderr)
             print("BENCHMARK_EVENT event=load elapsed_ms=1250.0", file=sys.stderr)
-            print("BENCHMARK_EVENT event=prompt_eval elapsed_ms=1000.0 tokens=16", file=sys.stderr)
+            print("BENCHMARK_EVENT event=prompt_eval elapsed_ms=1000.0 tokens=23", file=sys.stderr)
             time.sleep(0.02)
             print("BENCHMARK_EVENT event=token index=0", flush=True)
             print("BENCHMARK_EVENT event=generation elapsed_ms=500.0 tokens=8", file=sys.stderr)
@@ -156,10 +156,10 @@ class Issue12BenchmarkContracts(unittest.TestCase):
             "provenance": {
                 "request_id": "observed-evaluation-request",
                 "transcript": [], "sanitized": True, "synthetic_fixture": False,
-                "model": {"id": "Qwen3.5-27B-Q8_0", "quantization": "Q8_0",
+                "model": {"id": "Qwen3.5-27B-Q8_0",
                           "sha256": "6b0a101b0a86697fe11eabcc1a7db72699a9f3d4b18b6a1ac75ea3fb2c26c450",
-                          "source": "verified-live"},
-                "runtime": {"ref": "b10446", "commit": "adb55e5", "source": "observed",
+                          "synthetic_fixture": False},
+                "runtime": {"ref": "b10446", "commit": "adb55e5",
                             "synthetic_fixture": False},
                 "candidate": {"tuple_id": candidate["tuple_id"],
                               "config_id": candidate["config_id"],
@@ -203,7 +203,7 @@ class Issue12BenchmarkContracts(unittest.TestCase):
             artifact = json.loads(output.read_text())
             self.assertEqual(artifact["benchmark"]["name"], "issue-12-benchmark")
             self.assertEqual([r["mode"] for r in artifact["runs"]], ["cold", "warm"])
-            self.assertEqual(artifact["inputs"]["prompt"]["token_count"], 16)
+            self.assertEqual(artifact["inputs"]["prompt"]["token_count"], 23)
             self.assertEqual(artifact["inputs"]["output"]["token_count"], 8)
             self.assertEqual(artifact["inputs"]["model"], json.loads(CONFIG.read_text())["model"])
             tuning = json.loads(TUNING.read_text())
@@ -233,7 +233,7 @@ class Issue12BenchmarkContracts(unittest.TestCase):
                 self.assertLess(metrics["ttft_ms"], 100.0)
                 self.assertEqual(metrics["prompt_eval_ms"], 1000.0)
                 self.assertNotEqual(metrics["ttft_ms"], metrics["prompt_eval_ms"])
-                self.assertEqual(metrics["prompt_tokens"], 16)
+                self.assertEqual(metrics["prompt_tokens"], 23)
                 self.assertEqual(metrics["generation_tokens"], 8)
                 self.assertGreater(metrics["prompt_tokens_per_second"], 0)
                 self.assertGreater(metrics["generation_tokens_per_second"], 0)

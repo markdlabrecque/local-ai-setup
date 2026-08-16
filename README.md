@@ -89,8 +89,10 @@ The fixed cold/warm benchmark consumes the Issue #6 stable candidate and the
 passing Issue #11 report. It records streaming TTFT separately from prompt
 evaluation, bounds process groups/captures, and supports tamper-checked
 `--resume`. Use the portable gate and safe live command in
-[`docs/issue-12-benchmark.md`](docs/issue-12-benchmark.md); do not run the
-real 28 GB benchmark in a child.
+[`docs/issue-12-benchmark.md`](docs/issue-12-benchmark.md). The completed live
+measurements and machine-readable evidence are in
+[`docs/issue-12-benchmark-result.md`](docs/issue-12-benchmark-result.md) and
+[`docs/issue-12-benchmark-result.json`](docs/issue-12-benchmark-result.json).
 
 ## Security
 

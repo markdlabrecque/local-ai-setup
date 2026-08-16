@@ -38,17 +38,22 @@ scripts/run-benchmark.sh --config config/benchmark.json \
 ```
 
 The default cold-cache state is **deferred** and cannot publish a passing
-benchmark. After verifying that `/proc/sys/vm/drop_caches` is writable and
-explicitly authorizing privileged eviction, repeat with `--evict-cache`:
+benchmark. Explicitly request eviction of the verified model file's clean
+page-cache entries with `--evict-cache`:
 
 ```bash
-sudo scripts/run-benchmark.sh --config config/benchmark.json \
+scripts/run-benchmark.sh --config config/benchmark.json \
   --tuning-result docs/issue-6-hybrid-vulkan-tuning-result.json \
   --evaluation-report results/evaluation.json \
   --model "$HOME/.local/share/local-ai/models/Qwen3.5-27B-Q8_0.gguf" \
   --llama-cli "$HOME/.local/share/local-ai/runtime/llama-cli" \
   --output results/issue-12-benchmark.json --evict-cache
 ```
+
+The runner hashes the model first and then uses `POSIX_FADV_DONTNEED` on that
+same no-follow file descriptor. This narrowly evicts model-backed pages as the
+calling user; it neither runs the benchmark as root nor drops unrelated host
+caches. Stop or unload any process mapping the model before the cold run.
 
 This is a real Q8_0 benchmark and is intentionally not run by the child. The
 command has a default of **120 seconds per lifecycle**; the hard
@@ -79,7 +84,7 @@ synthetic or unsanitized are rejected.
 
 The b10446 command uses supported flags only: notably it does **not** send the
 unsupported `--prompt-tokens` flag. Prompt and output lengths are fixed at the
-observed pinned-tokenizer counts 25 and 8 tokens; their prompt tokens and
+observed pinned-tokenizer counts 23 and 8 tokens; their prompt tokens and
 generation tokens counts must be observed in distinct prompt-eval and eval
 lines. `load time`, prompt evaluation, generation evaluation, and TTFT are
 separate observations. **TTFT** is the timestamp of the first actual stdout
@@ -87,7 +92,7 @@ byte, never prompt evaluation.
 
 Each lifecycle passes `--no-warmup`. The model checksum is computed before
 any cache preparation. Cold and warm cache preparation/evidence is recorded in
-order, with a fresh process for each. Without explicit privileged eviction,
+order, with a fresh process for each. Without explicit model-file eviction,
 cold is recorded as deferred/unsupported and a benchmark pass is impossible;
 warm is the second run after the first observed run. Hardware evidence is a
 continuous set of live runtime samples: every sample must identify PCI

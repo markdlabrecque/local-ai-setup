@@ -12,7 +12,7 @@
     "sha256": "6b0a101b0a86697fe11eabcc1a7db72699a9f3d4b18b6a1ac75ea3fb2c26c450"
   },
   "build": {"ref": "b10446", "commit": "adb55e5"},
-  "prompt": {"text": "Respond with exactly: LOCAL_AI_BENCHMARK_OK", "token_count": 25, "observed_token_count": 25,
+  "prompt": {"text": "Respond with exactly: LOCAL_AI_BENCHMARK_RESULT_PASS_OK", "token_count": 23, "observed_token_count": 23,
     "tokenizer": {"pinned": true, "preflight": true, "source": "observed-pinned-llama.cpp", "build": {"ref": "b10446", "commit": "adb55e5"}}},
   "output": {"token_count": 8},
   "context_tokens": 32768,
@@ -33,7 +33,7 @@
     "minimum_available_vram_mib": 1024,
     "minimum_available_ram_mib": 8192,
     "maximum_swap_in_pages": 0,
-    "cache_eviction": {"explicit_opt_in": true, "method": "page-cache-eviction",
-      "unprivileged_status": "deferred"}
+    "cache_eviction": {"explicit_opt_in": true, "method": "model-file-fadvise",
+      "unprivileged_status": "supported"}
   }
 }

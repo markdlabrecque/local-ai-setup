@@ -282,18 +282,18 @@ class Issue12Cycle2Regressions(unittest.TestCase):
     def test_c2_005_pinned_tokenizer_count_and_committed_fixture_validate_without_dependency(self):
         config = json.loads(CONFIG.read_text())
         prompt = config["prompt"]
-        self.assertEqual(prompt["token_count"], 25)
-        self.assertEqual(prompt["observed_token_count"], 25)
+        self.assertEqual(prompt["token_count"], 23)
+        self.assertEqual(prompt["observed_token_count"], 23)
         self.assertTrue(prompt["tokenizer"]["pinned"])
         self.assertTrue(prompt["tokenizer"]["preflight"])
         schema = json.loads(BENCHMARK_SCHEMA.read_text())
-        self.assertEqual(schema["properties"]["inputs"]["properties"]["prompt"]["properties"]["token_count"]["const"], 25)
-        self.assertEqual(schema["$defs"]["run"]["properties"]["metrics"]["properties"]["prompt_tokens"]["const"], 25)
+        self.assertEqual(schema["properties"]["inputs"]["properties"]["prompt"]["properties"]["token_count"]["const"], 23)
+        self.assertEqual(schema["$defs"]["run"]["properties"]["metrics"]["properties"]["prompt_tokens"]["const"], 23)
         fixture = json.loads(BENCHMARK_FIXTURE.read_text())
         validate_json_schema(fixture, schema)
         self.assertIs(fixture["inputs"]["lifecycle"]["warmup"], False)
         for run in fixture["runs"]:
-            self.assertEqual(run["metrics"]["prompt_tokens"], 25)
+            self.assertEqual(run["metrics"]["prompt_tokens"], 23)
             self.assertIs(run["lifecycle"]["warmup"], False)
 
 

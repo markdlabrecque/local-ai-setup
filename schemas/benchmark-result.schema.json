@@ -16,7 +16,7 @@
         "runtime": {"type": "object", "required": ["ref", "commit", "source", "synthetic_fixture"], "additionalProperties": false,
           "properties": {"ref": {"const": "b10446"}, "commit": {"const": "adb55e5"}, "source": {"const": "observed"}, "synthetic_fixture": {"const": false}}},
         "prompt": {"type": "object", "required": ["token_count", "observed_token_count", "tokenizer"], "properties": {
-          "token_count": {"const": 25}, "observed_token_count": {"const": 25},
+          "token_count": {"const": 23}, "observed_token_count": {"const": 23},
           "tokenizer": {"type": "object", "required": ["pinned", "preflight"], "properties": {"pinned": {"const": true}, "preflight": {"const": true}}}}},
         "output": {"type": "object", "required": ["token_count"], "properties": {"token_count": {"const": 8}}},
         "context_tokens": {"const": 32768},
@@ -24,7 +24,7 @@
           "modes": {"const": ["cold", "warm"]},
           "warmup": {"const": false},
           "cold": {"type": "object", "required": ["cache_miss", "new_process", "warmup", "checksum_before_preparation", "cache_preparation", "verifiable_or_deferred"], "properties": {
-            "checksum_before_preparation": {"const": true}, "cache_preparation": {"enum": ["page-cache-eviction", "deferred", "unsupported"]}, "verifiable_or_deferred": {"const": true}}},
+            "checksum_before_preparation": {"const": true}, "cache_preparation": {"enum": ["model-file-fadvise", "page-cache-eviction", "deferred", "unsupported"]}, "verifiable_or_deferred": {"const": true}}},
           "warm": {"type": "object", "required": ["cache_hit", "new_process", "warmup", "observed_after", "follows_observed_first_run"], "properties": {
             "observed_after": {"const": "cold"}, "follows_observed_first_run": {"const": true}}}}},
         "candidate": {"type": "object", "required": ["status", "tuple_id", "parameters", "quality", "evidence", "evidence_id"]}
@@ -44,7 +44,7 @@
         "mode": {"enum": ["cold", "warm"]}, "cache": {"enum": ["miss", "hit"]}, "status": {"enum": ["pass", "fail", "timeout"]},
         "lifecycle": {"type": "object", "required": ["started", "bounded", "finished", "warmup", "new_process", "cache_evidence"], "properties": {"started": {"const": true}, "bounded": {"const": true}, "finished": {"const": true}, "warmup": {"const": false}, "new_process": {"const": true}, "cache_evidence": {"type": "object", "required": ["checksum_before_preparation", "preparation", "honest_status"], "properties": {"checksum_before_preparation": {"const": true}, "preparation": {"type": "string", "minLength": 1}, "honest_status": {"enum": ["verified-miss", "verified-hit", "unsupported", "deferred"]}}}}},
         "metrics": {"type": "object", "required": ["load_time_ms", "ttft_ms", "prompt_eval_ms", "prompt_tokens", "prompt_tokens_per_second", "generation_eval_ms", "generation_tokens", "generation_tokens_per_second"], "properties": {
-          "load_time_ms": {"type": "number", "minimum": 0}, "ttft_ms": {"type": "number", "minimum": 0}, "prompt_eval_ms": {"type": "number", "minimum": 0}, "prompt_tokens": {"const": 25}, "prompt_tokens_per_second": {"type": "number", "exclusiveMinimum": 0}, "generation_eval_ms": {"type": "number", "minimum": 0}, "generation_tokens": {"const": 8}, "generation_tokens_per_second": {"type": "number", "exclusiveMinimum": 0}}},
+          "load_time_ms": {"type": "number", "minimum": 0}, "ttft_ms": {"type": "number", "minimum": 0}, "prompt_eval_ms": {"type": "number", "minimum": 0}, "prompt_tokens": {"const": 23}, "prompt_tokens_per_second": {"type": "number", "exclusiveMinimum": 0}, "generation_eval_ms": {"type": "number", "minimum": 0}, "generation_tokens": {"const": 8}, "generation_tokens_per_second": {"type": "number", "exclusiveMinimum": 0}}},
         "hardware": {"type": "object", "required": ["selected_gpu", "pci_id", "samples", "ram", "vram", "swap", "sampling"], "properties": {
           "selected_gpu": {"const": "Vulkan0"}, "pci_id": {"const": "1002:73BF"}, "samples": {"type": "array", "minItems": 2, "items": {"type": "object", "required": ["pci_id", "drm_device", "source", "vram_capacity_mib", "vram_used_mib", "ram_available_mib", "swap_in_pages"], "properties": {"pci_id": {"const": "1002:73BF"}, "source": {"const": "drm"}, "drm_device": {"type": "string", "minLength": 1}}}},
           "sampling": {"type": "object", "required": ["owner", "source", "continuous", "proc_root"], "properties": {"owner": {"const": "runner"}, "source": {"const": "drm"}, "continuous": {"const": true}, "proc_root": {"type": "string", "minLength": 1}}},
