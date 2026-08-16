@@ -353,7 +353,7 @@ class Issue7ReviewRegressions(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="issue7-identity-") as tmp:
             root = Path(tmp)
             manifest, model = self.manifest(root, "Qwen3.5-27B-Q8_0.gguf")
-            lock_path = Path(str(model) + ".lock")
+            lock_path = model.parent / ("." + model.name + ".lock")
             lock_holder = subprocess.Popen(
                 [sys.executable, "-c", textwrap.dedent("""
                     import fcntl, sys, time
