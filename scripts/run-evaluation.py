@@ -536,22 +536,35 @@ def run_case(case: dict, endpoint: str, sandbox: Path) -> tuple[dict, list[dict]
 
     if kind == "overflow":
         marker = "PRESERVE-USER-CONTENT"
-        oversized = ("context " * 32000) + marker
+        # The deliberately oversized first request contains only discardable
+        # history. The compact retry introduces and must preserve current user
+        # content, making the two phases unambiguous to fixtures and reports.
+        oversized = "context " * 32000
+        overflow_observed = False
         try:
-            response, trace = call_for_case(endpoint, case, "overflow " + oversized)
+            _response, trace = call_for_case(endpoint, case, "overflow " + oversized)
             transcripts.append(trace)
         except EndpointError as error:
-            if error.status != 400:
+            error_text = canonical(error.body).lower() if error.body is not None else ""
+            overflow_observed = error.status == 400 and any(
+                marker_text in error_text for marker_text in ("context_length_exceeded", "context length", "too many tokens")
+            )
+            if not overflow_observed:
                 raise
+        if not overflow_observed:
+            return result(case, False, 0, {"compacted": False, "lost_user_content": False,
+                          "retry": False, "overflow_observed": False}), transcripts
         compact_prompt = "overflow compacted context; preserve this exact user content: " + marker
         response, trace = call_for_case(endpoint, case, compact_prompt, attempt=2)
         transcripts.append(trace)
         text = bounded(assistant_message(response).get("content", ""))
         recovered = marker in text
         compacted = len(compact_prompt) < len("overflow " + oversized)
-        return result(case, compacted and recovered, 1 if compacted and recovered else 0,
+        passed = overflow_observed and compacted and recovered
+        return result(case, passed, 1 if passed else 0,
                       {"compacted": compacted, "lost_user_content": not recovered,
-                       "retry": True, "original_request_bytes": len(canonical({"messages": [{"role": "user", "content": "overflow " + oversized}]})),
+                       "retry": True, "overflow_observed": overflow_observed,
+                       "original_request_bytes": len(canonical({"messages": [{"role": "user", "content": "overflow " + oversized}]})),
                        "compacted_request_bytes": len(canonical({"messages": [{"role": "user", "content": compact_prompt}]}))}), transcripts
 
     if kind == "provenance":

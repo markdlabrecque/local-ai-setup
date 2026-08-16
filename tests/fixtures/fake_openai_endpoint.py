@@ -40,6 +40,13 @@ class Handler(BaseHTTPRequestHandler):
         # in-flight request while allowing /health to prove recovery.
         if request.get("eval_cancel_probe"):
             time.sleep(0.25)
+        # The first overflow attempt must observe a real OpenAI-style context
+        # error before the evaluator may claim a compacted retry.
+        if "overflow " in marker and len(marker) > 200000 and "overflow compacted context" not in marker:
+            self._reply({"error": {"message": "context length exceeded",
+                                   "type": "context_length_exceeded",
+                                   "code": "context_length_exceeded"}}, 400)
+            return
         has_tool_result = any(m.get("role") == "tool" for m in messages if isinstance(m, dict))
         if "malformed" in marker:
             message = {"role": "assistant", "tool_calls": [{"id": "bad", "type": "function"}]}
