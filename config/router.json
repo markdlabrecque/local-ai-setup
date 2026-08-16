@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "build": {
+    "ref": "b10446",
+    "commit": "adb55e5"
+  },
+  "host": "127.0.0.1",
+  "port": 8080,
+  "models_dir_env": "LOCAL_AI_MODEL_DIR",
+  "runtime_dir_env": "LOCAL_AI_RUNTIME_DIR",
+  "server_env": "LOCAL_AI_SERVER",
+  "startup_timeout_seconds": 30,
+  "health_timeout_seconds": 5,
+  "preset_format": "llama.cpp-b10446-ini-generated-from-json"
+}

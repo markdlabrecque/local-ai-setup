@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "build": {"ref": "b10446", "commit": "adb55e5"},
+  "autoload": false,
+  "presets": {
+    "qwen3.5-27b-q8_0": {"filename": "Qwen3.5-27B-Q8_0.gguf", "context": 32768, "device": "Vulkan0", "gpu_layers": 20, "flash_attention": "on", "batch": 256, "ubatch": 128, "cache_k": "q8_0", "cache_v": "q8_0", "autoload": false, "quality_preserving": true},
+    "qwen3.5-27b-q6_k": {"filename": "Qwen3.5-27B-Q6_K.gguf", "context": 32768, "device": "Vulkan0", "gpu_layers": 20, "flash_attention": "on", "batch": 256, "ubatch": 128, "cache_k": "q8_0", "cache_v": "q8_0", "autoload": false, "quality_preserving": true}
+  }
+}

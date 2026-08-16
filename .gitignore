@@ -8,3 +8,5 @@ results/
 # Optional project-local caches
 .cache/
 build/
+__pycache__/
+*.py[cod]

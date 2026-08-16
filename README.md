@@ -53,6 +53,19 @@ The verified Issue #5 Vulkan/Q8_0 baseline and reproducible command are document
 
 The resumable Q8_0 tuning harness, pinned matrix, and sanitized RX 6900 XT result are documented in [`docs/issue-6-hybrid-vulkan-tuning-result.md`](docs/issue-6-hybrid-vulkan-tuning-result.md).
 
+## Router mode (Issue #7)
+
+The pinned localhost router launcher, explicit Q8_0/Q6_K presets, checksum-gated model lifecycle helper, and opt-in smoke command are documented in [`docs/issue-7-router.md`](docs/issue-7-router.md). The portable contract is [`config/router.json`](config/router.json) plus [`config/router-presets.json`](config/router-presets.json).
+
+```bash
+scripts/run-router.sh --foreground
+scripts/router-model.sh load --model-id qwen3.5-27b-q8_0
+# Optional, against an already-running real router:
+scripts/router-smoke.sh --real
+```
+
+The launcher binds only to `127.0.0.1:8080`, passes `--no-models-autoload`, isolates router configuration, and cleans its complete server process group with a finite TERM/KILL grace period. It generates private presets only for present GGUF artifacts and never deletes model files. The lifecycle helper shares the downloader lock, verifies identity before and after asynchronous load/unload, sends extensionless b10446 IDs, and requires the exact success response. The portable test uses a fake server; do not start the real 28 GB model for that gate.
+
 ## Issue #11 evaluation
 
 Run the portable evaluation gate with the deterministic OpenAI-compatible
