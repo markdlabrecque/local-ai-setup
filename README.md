@@ -95,6 +95,13 @@ bounded sanitized artifacts, and the report contract in
 [`schemas/evaluation-report.schema.json`](schemas/evaluation-report.schema.json).
 See [`docs/issue-11-evaluation.md`](docs/issue-11-evaluation.md).
 
+## Issue #9 router/API smoke test
+
+After installing the user service, the opt-in real lifecycle check validates
+health, model load/unload, streamed chat, cancellation, near-32K context, failed
+load recovery, and service restart recovery. See
+[`docs/issue-9-router-smoke.md`](docs/issue-9-router-smoke.md).
+
 ## Issue #12 benchmark
 
 The fixed cold/warm benchmark consumes the Issue #6 stable candidate and the
