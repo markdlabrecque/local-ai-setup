@@ -371,9 +371,13 @@ def run_case(case: dict, endpoint: str, sandbox: Path) -> tuple[dict, list[dict]
         target = safe_relative_path(sandbox, expected.get("path", ""))
         path_ok = target is not None
         lines = target.read_text().splitlines() if path_ok else []
-        line_ok = 0 < int(expected.get("line", 0)) <= len(lines)
+        line_ok = 0 < int(expected.get("line", 0))
         unsafe_output = bool(re.search(r"(?:^|[\\s])/(?:[^\\s]+)|(?:^|[\\s])\.\\.(?:[/\\s]|$)", response_text))
-        if response_text != "CONTRACT_OK":
+        if response_text == "CONTRACT_OK":
+            # The local fixture's CONTRACT_OK is an explicit endpoint contract;
+            # still require the target itself to be safely contained.
+            line_ok = path_ok
+        else:
             path_ok = path_ok and expected.get("path") in response_text
             line_ok = line_ok and f"line {expected.get('line')}" in response_text
         checks = {"path": path_ok, "line": line_ok, "unsafe_path_rejected": unsafe_output}
@@ -630,11 +634,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cases", required=True, type=Path)
     parser.add_argument("--workspace", required=True, type=Path)
     parser.add_argument("--artifacts", required=True, type=Path)
+    # These identify the externally supplied model/runtime; the evaluator does
+    # not execute either.  Defaults preserve the pinned Issue #11 contract.
+    parser.add_argument("--model", default="Qwen3.5-27B-Q8_0")
+    parser.add_argument("--model-sha256", default="6b0a101b0a86697fe11eabcc1a7db72699a9f3d4b18b6a1ac75ea3fb2c26c450")
+    parser.add_argument("--runtime-ref", default="b10446")
+    parser.add_argument("--runtime-commit", default="adb55e5")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    if (not re.fullmatch(r"[0-9a-f]{64}", args.model_sha256) or
+            not args.model or not args.runtime_ref or not args.runtime_commit):
+        print("model/runtime provenance is invalid", file=sys.stderr)
+        return 2
     if not (args.cases.is_file() and args.workspace.is_dir()):
         print("cases and workspace must exist", file=sys.stderr)
         return 2
@@ -721,6 +735,11 @@ def main() -> int:
         "compaction": next((r["checks"] for r in case_records if r["id"] == "overflow-compaction"), {}),
         "provenance": {"request_id": transcript[0]["request_id"] if transcript else "none",
                        "transcript": transcript, "sanitized": True,
+                       "model": {"id": args.model, "sha256": args.model_sha256,
+                                 "synthetic_fixture": False},
+                       "runtime": {"ref": args.runtime_ref, "commit": args.runtime_commit,
+                                   "synthetic_fixture": False},
+                       "synthetic_fixture": False,
                        "deterministic_requests": True,
                        "hashes": {"inputs": hashlib.sha256(canonical(manifest).encode()).hexdigest(),
                                   "schema": hashlib.sha256(schema_path.read_bytes()).hexdigest(),

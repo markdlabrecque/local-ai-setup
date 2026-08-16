@@ -46,11 +46,16 @@
     },
     "provenance": {
       "type": "object",
-      "required": ["request_id", "transcript", "sanitized", "hashes"],
+      "required": ["request_id", "transcript", "sanitized", "model", "runtime", "synthetic_fixture", "hashes"],
       "properties": {
         "request_id": {"type": "string", "minLength": 1},
         "transcript": {"type": "array", "maxItems": 64},
         "sanitized": {"const": true},
+        "model": {"type": "object", "required": ["id", "sha256", "synthetic_fixture"], "additionalProperties": false,
+          "properties": {"id": {"type": "string", "minLength": 1}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "synthetic_fixture": {"const": false}}},
+        "runtime": {"type": "object", "required": ["ref", "commit", "synthetic_fixture"], "additionalProperties": false,
+          "properties": {"ref": {"type": "string", "minLength": 1}, "commit": {"type": "string", "minLength": 1}, "synthetic_fixture": {"const": false}}},
+        "synthetic_fixture": {"const": false},
         "deterministic_requests": {"type": "boolean"},
         "hashes": {
           "type": "object",

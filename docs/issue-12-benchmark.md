@@ -37,12 +37,36 @@ scripts/run-benchmark.sh --config config/benchmark.json \
   --output results/issue-12-benchmark.json
 ```
 
+The default cold-cache state is **deferred** and cannot publish a passing
+benchmark. After verifying that `/proc/sys/vm/drop_caches` is writable and
+explicitly authorizing privileged eviction, repeat with `--evict-cache`:
+
+```bash
+sudo scripts/run-benchmark.sh --config config/benchmark.json \
+  --tuning-result docs/issue-6-hybrid-vulkan-tuning-result.json \
+  --evaluation-report results/evaluation.json \
+  --model "$HOME/.local/share/local-ai/models/Qwen3.5-27B-Q8_0.gguf" \
+  --llama-cli "$HOME/.local/share/local-ai/runtime/llama-cli" \
+  --output results/issue-12-benchmark.json --evict-cache
+```
+
 This is a real Q8_0 benchmark and is intentionally not run by the child. The
 command has a default of **120 seconds per lifecycle**; the hard
 limit is 300 seconds. The model load plus two bounded runs may take several
-minutes. A real evaluation report cannot be produced until the pinned model,
-CLI, RX 6900 XT mapping, and passing non-synthetic Issue #11 report are all
-available.
+minutes. A real evaluation report can be produced (without running a model command) with
+explicit provenance once the local endpoint, bounded workspace, and real model
+identity are known:
+
+```bash
+scripts/run-evaluation.sh --endpoint http://127.0.0.1:PORT \
+  --cases tests/fixtures/evaluation_cases.json --workspace "$PWD" \
+  --artifacts results/evaluation.json --model Qwen3.5-27B-Q8_0 \
+  --model-sha256 6b0a101b0a86697fe11eabcc1a7db72699a9f3d4b18b6a1ac75ea3fb2c26c450 \
+  --runtime-ref b10446 --runtime-commit adb55e5
+```
+
+The benchmark still requires the pinned model, CLI, RX 6900 XT mapping, and
+passing non-synthetic Issue #11 report.
 
 ## Fixed inputs and observations
 
@@ -54,14 +78,18 @@ model and runtime provenance must match this benchmark. Reports marked
 synthetic or unsanitized are rejected.
 
 The b10446 command uses supported flags only: notably it does **not** send the
-unsupported `--prompt-tokens` flag. Prompt and output lengths are fixed at 16
-and 8 tokens; their prompt tokens and generation tokens counts must be observed in distinct prompt-eval and eval
+unsupported `--prompt-tokens` flag. Prompt and output lengths are fixed at the
+observed pinned-tokenizer counts 25 and 8 tokens; their prompt tokens and
+generation tokens counts must be observed in distinct prompt-eval and eval
 lines. `load time`, prompt evaluation, generation evaluation, and TTFT are
 separate observations. **TTFT** is the timestamp of the first actual stdout
 byte, never prompt evaluation.
 
-Each lifecycle passes `--no-warmup`. Cold and warm cache preparation/evidence
-is recorded in order, with a fresh process for each. Hardware evidence is a
+Each lifecycle passes `--no-warmup`. The model checksum is computed before
+any cache preparation. Cold and warm cache preparation/evidence is recorded in
+order, with a fresh process for each. Without explicit privileged eviction,
+cold is recorded as deferred/unsupported and a benchmark pass is impossible;
+warm is the second run after the first observed run. Hardware evidence is a
 continuous set of live runtime samples: every sample must identify PCI
 `1002:73BF`, and the runner fails closed if samples, RX 6900 XT identity, RAM,
 VRAM, or swap observations are absent or unsafe. Raw logs are never retained

@@ -67,6 +67,64 @@ def integer(value, name, minimum=0):
         raise ValueError(f"invalid {name}")
 
 
+def validate_json_schema(value, schema, root=None, path="$"):
+    """Small dependency-free validator for the committed JSON contracts."""
+    root = schema if root is None else root
+    if "$ref" in schema:
+        target = root
+        for part in schema["$ref"][2:].split("/"):
+            target = target[part]
+        validate_json_schema(value, target, root, path)
+        return
+    for branch in schema.get("allOf", []):
+        validate_json_schema(value, branch, root, path)
+    if "const" in schema and value != schema["const"]:
+        raise ValueError(f"Issue 11 schema validation failed at {path}: const")
+    if "enum" in schema and value not in schema["enum"]:
+        raise ValueError(f"Issue 11 schema validation failed at {path}: enum")
+    kind = schema.get("type")
+    valid = {
+        "object": isinstance(value, dict), "array": isinstance(value, list),
+        "string": isinstance(value, str),
+        "integer": isinstance(value, int) and not isinstance(value, bool),
+        "number": isinstance(value, (int, float)) and not isinstance(value, bool),
+        "boolean": isinstance(value, bool),
+    }
+    if kind in valid and not valid[kind]:
+        raise ValueError(f"Issue 11 schema validation failed at {path}: type")
+    if isinstance(value, dict):
+        for key in schema.get("required", []):
+            if key not in value:
+                raise ValueError(f"Issue 11 schema validation failed at {path}: missing {key}")
+        properties = schema.get("properties", {})
+        if schema.get("additionalProperties") is False and set(value) - set(properties):
+            raise ValueError(f"Issue 11 schema validation failed at {path}: unknown property")
+        for key, child in properties.items():
+            if key in value:
+                validate_json_schema(value[key], child, root, path + "." + key)
+    elif isinstance(value, list):
+        if len(value) < schema.get("minItems", 0) or ("maxItems" in schema and len(value) > schema["maxItems"]):
+            raise ValueError(f"Issue 11 schema validation failed at {path}: array bounds")
+        for index, child in enumerate(schema.get("prefixItems", [])):
+            if index < len(value):
+                validate_json_schema(value[index], child, root, f"{path}[{index}]")
+        items = schema.get("items")
+        if isinstance(items, dict):
+            start = len(schema.get("prefixItems", []))
+            for index in range(start, len(value)):
+                validate_json_schema(value[index], items, root, f"{path}[{index}]")
+    if isinstance(value, str):
+        if len(value) < schema.get("minLength", 0):
+            raise ValueError(f"Issue 11 schema validation failed at {path}: string length")
+        if "pattern" in schema and not re.fullmatch(schema["pattern"], value):
+            raise ValueError(f"Issue 11 schema validation failed at {path}: pattern")
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if "minimum" in schema and value < schema["minimum"]:
+            raise ValueError(f"Issue 11 schema validation failed at {path}: minimum")
+        if "exclusiveMinimum" in schema and value <= schema["exclusiveMinimum"]:
+            raise ValueError(f"Issue 11 schema validation failed at {path}: exclusive minimum")
+
+
 def validate_candidate(tuning):
     if tuning.get("schema_version") != "hybrid-vulkan-tuning-v1" or tuning.get("build") != BUILD:
         raise ValueError("Issue 6 tuning identity mismatch")
@@ -97,7 +155,9 @@ def validate_candidate(tuning):
 
 
 def validate_report(report):
-    """Validate the Issue 11 artifact semantically, not just by its label."""
+    """Validate the complete Issue 11 schema, then its semantic contract."""
+    schema = load(ROOT / "schemas" / "evaluation-report.schema.json")
+    validate_json_schema(report, schema, schema)
     if report.get("schema_version") != 1:
         raise ValueError("Issue 11 report schema version is not 1")
     suite = report.get("suite", {})
@@ -125,13 +185,13 @@ def validate_report(report):
         raise ValueError("Issue 11 provenance hashes are incomplete")
     if any(not re.fullmatch(r"[0-9a-f]{64}", str(value)) for value in hashes.values()):
         raise ValueError("Issue 11 provenance hash is invalid")
-    if provenance.get("model", {}).get("id") != MODEL["id"]:
-        raise ValueError("Issue 11 model provenance mismatch")
+    model = provenance.get("model", {})
     runtime = provenance.get("runtime", {})
-    if runtime.get("ref") != BUILD["ref"] or runtime.get("commit") != BUILD["commit"]:
-        raise ValueError("Issue 11 runtime provenance mismatch")
-    if runtime.get("synthetic_fixture") is True:
-        raise ValueError("synthetic Issue 11 runtime provenance is not admissible")
+    if (not isinstance(model.get("id"), str) or not re.fullmatch(r"[0-9a-f]{64}", str(model.get("sha256"))) or
+            model.get("synthetic_fixture") is not False or
+            not isinstance(runtime.get("ref"), str) or not isinstance(runtime.get("commit"), str) or
+            runtime.get("synthetic_fixture") is not False):
+        raise ValueError("Issue 11 model/runtime provenance is incomplete or synthetic")
     return True
 
 
@@ -144,8 +204,13 @@ def validate_inputs(config, tuning, report):
         raise ValueError("benchmark model identity does not match pinned Q8_0 artifact")
     if config.get("context_tokens") != 32768:
         raise ValueError("context is not the fixed 32K contract")
-    if config.get("prompt", {}).get("token_count") != 16 or config.get("output", {}).get("token_count") != 8:
-        raise ValueError("prompt and output lengths are not fixed")
+    prompt = config.get("prompt", {})
+    if (prompt.get("token_count") != 25 or prompt.get("observed_token_count") != 25 or
+            prompt.get("tokenizer", {}).get("pinned") is not True or
+            prompt.get("tokenizer", {}).get("preflight") is not True):
+        raise ValueError("prompt tokenizer preflight/count is not the observed pinned contract")
+    if config.get("output", {}).get("token_count") != 8:
+        raise ValueError("output length is not fixed")
     lifecycle = config.get("lifecycle", {})
     if lifecycle.get("modes") != ["cold", "warm"]:
         raise ValueError("cold/warm lifecycle is not pinned")
@@ -154,6 +219,13 @@ def validate_inputs(config, tuning, report):
             raise ValueError(f"{mode} lifecycle must use a new process")
         if lifecycle[mode].get("warmup") is not False:
             raise ValueError(f"{mode} lifecycle must explicitly disable warmup")
+    cold = lifecycle.get("cold", {})
+    warm = lifecycle.get("warm", {})
+    if (cold.get("checksum_before_preparation") is not True or
+            cold.get("cache_preparation") not in {"page-cache-eviction", "deferred", "unsupported"} or
+            cold.get("verifiable_or_deferred") is not True or
+            warm.get("observed_after") != "cold" or warm.get("follows_observed_first_run") is not True):
+        raise ValueError("cache lifecycle is not honest or ordered")
     safety = config.get("safety", {})
     for key in ("minimum_free_vram_mib", "minimum_available_ram_mib", "maximum_swap_in_pages"):
         integer(safety.get(key), key)
@@ -243,29 +315,56 @@ def signal_handler(signum, _frame):
         kill_group(ACTIVE, 0.2)
 
 
-def parse_hardware(line, samples):
-    match = re.search(r"BENCHMARK_HARDWARE\s+(\{.*\})\s*$", line)
-    if not match:
-        return
+def _read_int(path):
     try:
-        value = json.loads(match.group(1))
-    except (ValueError, RecursionError):
-        return
-    required = ("pci_id", "vram_capacity_mib", "vram_used_mib", "ram_available_mib", "swap_in_pages")
-    if all(isinstance(value.get(key), (int, float, str)) for key in required):
-        try:
-            sample = {"pci_id": str(value["pci_id"]).upper(),
-                      "vram_capacity_mib": int(value["vram_capacity_mib"]),
-                      "vram_used_mib": int(value["vram_used_mib"]),
-                      "ram_available_mib": int(value["ram_available_mib"]),
-                      "swap_in_pages": int(value["swap_in_pages"])}
-        except (TypeError, ValueError):
-            return
-        if all(sample[key] >= 0 for key in sample if key != "pci_id"):
-            samples.append(sample)
+        return int(path.read_text().strip(), 0)
+    except (OSError, ValueError):
+        return None
 
 
-def run_once(cli, mode, timeout, capture_limit, params, quality, config, report_sha, model):
+def drm_device(sysfs_root):
+    """Select the exact PCI function from DRM sysfs, never runtime text."""
+    root = pathlib.Path(sysfs_root)
+    for card in sorted(root.glob("card*/device")):
+        vendor = _read_int(card / "vendor")
+        device = _read_int(card / "device")
+        if vendor == 0x1002 and device == 0x73BF:
+            return card
+    return None
+
+
+def proc_drm_sample(proc_root, sysfs_root):
+    card = drm_device(sysfs_root)
+    if card is None:
+        return None
+    try:
+        meminfo = {}
+        for line in (pathlib.Path(proc_root) / "meminfo").read_text().splitlines():
+            key, _, rest = line.partition(":")
+            fields = rest.strip().split()
+            if fields:
+                meminfo[key] = int(fields[0])
+        vmstat = {}
+        for line in (pathlib.Path(proc_root) / "vmstat").read_text().splitlines():
+            fields = line.split()
+            if len(fields) >= 2:
+                vmstat[fields[0]] = int(fields[1])
+        total = _read_int(card / "mem_info_vram_total")
+        used = _read_int(card / "mem_info_vram_used")
+        available_kib = meminfo.get("MemAvailable")
+        swap_in = vmstat.get("pswpin")
+        if None in (total, used, available_kib, swap_in) or min(total, used, available_kib, swap_in) < 0:
+            return None
+        return {"pci_id": PCI, "drm_device": "/dev/dri/" + card.parent.name,
+                "source": "drm", "vram_capacity_mib": total // (1024 * 1024),
+                "vram_used_mib": used // (1024 * 1024),
+                "ram_available_mib": available_kib // 1024, "swap_in_pages": swap_in}
+    except (OSError, ValueError):
+        return None
+
+
+def run_once(cli, mode, timeout, capture_limit, params, quality, config, report_sha, model,
+             proc_root="/proc", sysfs_root="/sys/class/drm", cache_evidence=None):
     global ACTIVE
     command = [str(cli), "--ctx-size", "32768", "--device", GPU,
                "--gpu-layers", str(params["gpu_layers"]), "--flash-attn", str(params["flash_attention"]),
@@ -291,6 +390,10 @@ def run_once(cli, mode, timeout, capture_limit, params, quality, config, report_
               "prompt_tokens": None, "generation_tokens": None, "ttft": None}
     samples = []
     observed_gpu = False
+    sample = proc_drm_sample(proc_root, sysfs_root)
+    if sample is not None:
+        samples.append(sample)
+    last_sample = time.monotonic()
     started = time.monotonic()
     timed_out = False
 
@@ -320,7 +423,6 @@ def run_once(cli, mode, timeout, capture_limit, params, quality, config, report_
         nonlocal observed_gpu
         if re.search(r"Vulkan0\s*:\s*AMD Radeon RX 6900 XT", line, re.I):
             observed_gpu = True
-        parse_hardware(line, samples)
 
     try:
         while selector.get_map():
@@ -328,6 +430,12 @@ def run_once(cli, mode, timeout, capture_limit, params, quality, config, report_
                 timed_out = not INTERRUPTED
                 kill_group(proc, config["cleanup"]["term_grace_seconds"])
                 break
+            now = time.monotonic()
+            if now - last_sample >= 0.01:
+                sample = proc_drm_sample(proc_root, sysfs_root)
+                if sample is not None:
+                    samples.append(sample)
+                last_sample = now
             for key, _ in selector.select(0.02):
                 stream, kind = key.fileobj, key.data
                 chunk = os.read(stream.fileno(), 65536)
@@ -353,6 +461,9 @@ def run_once(cli, mode, timeout, capture_limit, params, quality, config, report_
         for kind, line in pending.items():
             if line:
                 observe(kind, line[:16384])
+        sample = proc_drm_sample(proc_root, sysfs_root)
+        if sample is not None:
+            samples.append(sample)
     finally:
         try:
             selector.close()
@@ -361,21 +472,23 @@ def run_once(cli, mode, timeout, capture_limit, params, quality, config, report_
                 kill_group(proc, config["cleanup"]["term_grace_seconds"])
             ACTIVE = None
 
+    evidence = dict(cache_evidence or {})
+    evidence.setdefault("checksum_before_preparation", True)
+    evidence.setdefault("preparation", "cold-cache-before-first-process" if mode == "cold" else "after-cold-process-before-second-process")
+    evidence.setdefault("honest_status", "deferred" if mode == "cold" else "unsupported")
+    evidence.update({"mode": mode, "order": 0 if mode == "cold" else 1,
+                     "warmup_disabled": True})
     lifecycle = {"started": True, "bounded": True, "finished": True,
                  "warmup": False, "new_process": True,
-                 "cache_evidence": {"observed": True, "mode": mode,
-                                    "preparation": ("cold-cache-before-first-process" if mode == "cold"
-                                                    else "after-cold-process-before-second-process"),
-                                    "order": 0 if mode == "cold" else 1,
-                                    "warmup_disabled": True}}
+                 "cache_evidence": evidence}
     if timed_out or INTERRUPTED:
         return {"mode": mode, "cache": "miss" if mode == "cold" else "hit",
                 "status": "timeout", "lifecycle": lifecycle}
     required = (values["load"], values["ttft"], values["prompt"], values["generation"],
                 values["prompt_tokens"], values["generation_tokens"])
     if (proc.returncode != 0 or any(not isinstance(value, (int, float)) or value < 0 for value in required) or
-            values["prompt_tokens"] != 16 or values["generation_tokens"] != 8 or
-            not values["prompt"] or not values["generation"] or not samples or not observed_gpu):
+            values["prompt_tokens"] != config["prompt"]["observed_token_count"] or values["generation_tokens"] != 8 or
+            not values["prompt"] or not values["generation"] or len(samples) < 2 or not observed_gpu):
         return {"mode": mode, "cache": "miss" if mode == "cold" else "hit",
                 "status": "fail", "lifecycle": lifecycle}
     if any(sample["pci_id"] != PCI for sample in samples):
@@ -392,20 +505,51 @@ def run_once(cli, mode, timeout, capture_limit, params, quality, config, report_
     settings = {"model": MODEL["id"], "quantization": "Q8_0", "build": dict(BUILD),
                 "device": {"selected_gpu": GPU, "pci_id": PCI},
                 "context_tokens": 32768, "parameters": params}
-    status = "pass" if quality and ram_ok and vram_ok and swap_ok else "fail"
+    expected_cache_status = "verified-miss" if mode == "cold" else "verified-hit"
+    cache_ok = lifecycle["cache_evidence"].get("honest_status") == expected_cache_status
+    status = "pass" if quality and ram_ok and vram_ok and swap_ok and cache_ok else "fail"
     return {"mode": mode, "cache": "miss" if mode == "cold" else "hit", "status": status,
             "lifecycle": lifecycle,
             "metrics": {"load_time_ms": round(values["load"], 6), "ttft_ms": round(values["ttft"], 6),
-                        "prompt_eval_ms": round(values["prompt"], 6), "prompt_tokens": 16,
-                        "prompt_tokens_per_second": round(16 / (values["prompt"] / 1000), 6),
+                        "prompt_eval_ms": round(values["prompt"], 6), "prompt_tokens": config["prompt"]["observed_token_count"],
+                        "prompt_tokens_per_second": round(config["prompt"]["observed_token_count"] / (values["prompt"] / 1000), 6),
                         "generation_eval_ms": round(values["generation"], 6), "generation_tokens": 8,
                         "generation_tokens_per_second": round(8 / (values["generation"] / 1000), 6)},
             "hardware": {"selected_gpu": GPU, "pci_id": PCI, "samples": samples,
+                         "sampling": {"owner": "runner", "source": "drm", "continuous": True,
+                                      "proc_root": str(proc_root)},
                          "ram": {"minimum_available_mib": minimum_ram, "passed": ram_ok},
                          "vram": {"capacity_mib": capacity, "peak_mib": peak, "passed": vram_ok},
                          "swap": {"in_pages": swap, "passed": swap_ok}},
             "settings": settings,
             "quality": {"suite": "issue-11-evaluation", "report_sha256": report_sha, "passed": quality}}
+
+
+def prepare_cache(model, proc_root, requested):
+    """Prepare cold cache only after checksum and only with explicit opt-in."""
+    checksum = file_hash(model) if model is not None else None
+    evidence = {"checksum_before_preparation": True,
+                "model_checksum": checksum or "unavailable"}
+    if not requested:
+        evidence.update({"preparation": "not-requested", "honest_status": "deferred"})
+        return evidence
+    if model is None:
+        evidence.update({"preparation": "model-not-supplied", "honest_status": "unsupported"})
+        return evidence
+    drop_caches = pathlib.Path(proc_root) / "sys/vm/drop_caches"
+    if os.geteuid() != 0 or not drop_caches.is_file() or not os.access(drop_caches, os.W_OK):
+        evidence.update({"preparation": "privileged-eviction-unavailable", "honest_status": "deferred"})
+        return evidence
+    try:
+        # sync plus drop_caches=3 is the documented Linux page-cache operation;
+        # no shell or arbitrary privileged command is involved.
+        os.sync()
+        drop_caches.write_text("3")
+    except OSError:
+        evidence.update({"preparation": "privileged-eviction-failed", "honest_status": "deferred"})
+        return evidence
+    evidence.update({"preparation": "page-cache-eviction", "honest_status": "verified-miss"})
+    return evidence
 
 
 def artifact_hash(data):
@@ -426,7 +570,8 @@ def validate_artifact(data, config, hashes, candidate, params):
     inputs = data.get("inputs", {})
     if inputs.get("model") != MODEL or inputs.get("runtime") != {"ref": "b10446", "commit": "adb55e5", "source": "observed", "synthetic_fixture": False}:
         raise ValueError("resume artifact runtime or model identity mismatch")
-    if inputs.get("candidate") != candidate or inputs.get("prompt", {}).get("token_count") != 16 or inputs.get("output", {}).get("token_count") != 8:
+    if (inputs.get("candidate") != candidate or inputs.get("prompt", {}).get("token_count") != 25 or
+            inputs.get("prompt", {}).get("observed_token_count") != 25 or inputs.get("output", {}).get("token_count") != 8):
         raise ValueError("resume artifact input identity mismatch")
     runs = data.get("runs", [])
     if len(runs) != 2 or [row.get("mode") for row in runs] != ["cold", "warm"] or [row.get("cache") for row in runs] != ["miss", "hit"]:
@@ -444,6 +589,10 @@ def main():
     parser.add_argument("--model")
     parser.add_argument("--output", required=True)
     parser.add_argument("--run-timeout", type=float)
+    parser.add_argument("--evict-cache", action="store_true",
+                        help="explicitly request privileged page-cache eviction")
+    parser.add_argument("--proc-root", default="/proc")
+    parser.add_argument("--sysfs-root", default="/sys/class/drm")
     parser.add_argument("--resume", action="store_true")
     args = parser.parse_args()
     try:
@@ -469,6 +618,10 @@ def main():
         model = pathlib.Path(args.model).resolve() if args.model else None
         if model is not None and (not model.is_file() or file_hash(model).lower() != MODEL["sha256"]):
             raise ValueError("model checksum or identity mismatch")
+        cold_cache = prepare_cache(model, args.proc_root, args.evict_cache)
+        warm_cache = dict(cold_cache)
+        warm_cache.update({"preparation": "after-cold-process-before-second-process",
+                           "honest_status": "verified-hit" if cold_cache["honest_status"] == "verified-miss" else "deferred"})
         timeout = float(config["timeout_seconds"] if args.run_timeout is None else args.run_timeout)
         if not 0 < timeout <= MAX_TIMEOUT or timeout > float(config["timeout_seconds"]):
             raise ValueError("run timeout is outside the bounded config limit")
@@ -479,13 +632,20 @@ def main():
         signal.signal(signal.SIGINT, signal_handler)
         version(cli)
         report_sha = hashes[2]
-        runs = [run_once(cli, mode, timeout, capture_limit, params, True, config, report_sha, model)
-                for mode in ("cold", "warm")]
+        runs = [run_once(cli, "cold", timeout, capture_limit, params, True, config, report_sha, model,
+                         args.proc_root, args.sysfs_root, cold_cache),
+                run_once(cli, "warm", timeout, capture_limit, params, True, config, report_sha, model,
+                         args.proc_root, args.sysfs_root, warm_cache)]
         passed = sum(row.get("status") == "pass" for row in runs)
+        lifecycle = json.loads(json.dumps(config["lifecycle"]))
+        lifecycle["cold"]["cache_preparation"] = ("page-cache-eviction" if cold_cache["honest_status"] == "verified-miss"
+                                                   else cold_cache["honest_status"])
+        lifecycle["warm"]["observed_after"] = "cold"
         data = {"schema_version": SCHEMA_VERSION, "benchmark": {"name": "issue-12-benchmark", "version": 1},
                 "inputs": {"model": MODEL, "runtime": {"ref": "b10446", "commit": "adb55e5", "source": "observed", "synthetic_fixture": False},
-                           "prompt": {"token_count": 16}, "output": {"token_count": 8},
-                           "context_tokens": 32768, "lifecycle": config["lifecycle"], "candidate": candidate},
+                           "prompt": {"token_count": 25, "observed_token_count": 25,
+                                       "tokenizer": config["prompt"]["tokenizer"]}, "output": {"token_count": 8},
+                           "context_tokens": 32768, "lifecycle": lifecycle, "candidate": candidate},
                 "runs": runs, "summary": {"status": "pass" if passed == 2 else "fail", "passed_runs": passed},
                 "safety": {"selected_gpu": GPU, "selected_pci_id": PCI,
                            "swap_in_pages": max((row.get("hardware", {}).get("swap", {}).get("in_pages", 0) for row in runs), default=0),
@@ -493,12 +653,18 @@ def main():
                            "vram_passed": all(row.get("hardware", {}).get("vram", {}).get("passed", False) for row in runs)},
                 "provenance": {"config_sha256": hashes[0], "tuning_result_sha256": hashes[1],
                                "evaluator_report_sha256": hashes[2], "artifact_sha256": "", "sanitized": True}}
+        if passed != 2 and any("hardware" not in row or len(row.get("hardware", {}).get("samples", [])) < 2
+                               for row in runs):
+            raise ValueError("runner-owned /proc DRM hardware samples are unavailable; refusing publication")
         data["provenance"]["artifact_sha256"] = artifact_hash(data)
+        validate_json_schema(data, load(ROOT / "schemas" / "benchmark-result.schema.json"))
         encoded = json.dumps(data, sort_keys=True, indent=2) + "\n"
         if len(encoded.encode()) > MAX_ARTIFACT:
             raise ValueError("benchmark artifact exceeds bounded size")
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(encoded)
+        if passed != 2:
+            print("benchmark did not pass: runner-owned /proc DRM hardware samples and honest cache evidence are required", file=sys.stderr)
         return 0 if passed == 2 else 1
     except (ValueError, OSError, KeyError, TypeError, json.JSONDecodeError) as error:
         return die(str(error))
