@@ -691,6 +691,18 @@
     "policy": "pass, generation-tps desc, prompt-tps desc, prompt-eval-ms asc, generation-eval-ms asc, peak-vram asc, tuple-id asc"
   },
   "stable_candidate": {
+    "schema_version": "hybrid-vulkan-tuning-v1",
+    "status": "pass",
+    "tuple_id": "86535f788b85182129f52059c677a511e5ad44f9f7c4c156f703b0547b8130da",
+    "config_id": "3bc4787e59d7511554cf0698f20669b3aa7b5efa07f19e9cf790bf401eee4724",
+    "parameters": {
+      "batch": 256,
+      "flash_attention": "on",
+      "gpu_layers": 20,
+      "kv_cache": "q8_0",
+      "quantization": "Q8_0",
+      "ubatch": 128
+    },
     "metrics": {
       "exit_code": 0,
       "generation_eval_ms": 3825.83,
@@ -706,13 +718,38 @@
       "timed_out": false,
       "vram_capacity_mib": 16368
     },
-    "parameters": {
-      "batch": 256,
-      "flash_attention": "on",
-      "gpu_layers": 20,
-      "kv_cache": "q8_0",
-      "quantization": "Q8_0",
-      "ubatch": 128
-    }
+    "quality": {
+      "context_confirmed": true,
+      "device_confirmed": true,
+      "exact_completion": true,
+      "offload_confirmed": true,
+      "passed": true,
+      "stability_confirmed": true,
+      "timing_confirmed": true
+    },
+    "evidence": {
+      "attempt_count": 3,
+      "attempt_ids": [
+        "86535f788b85182129f52059c677a511e5ad44f9f7c4c156f703b0547b8130da.attempt-01",
+        "86535f788b85182129f52059c677a511e5ad44f9f7c4c156f703b0547b8130da.attempt-02",
+        "86535f788b85182129f52059c677a511e5ad44f9f7c4c156f703b0547b8130da.attempt-03"
+      ],
+      "attempts_digest": "93d4bf5597ecaf4c6dc66c7d3d087ebd4912279f28e6b8962e7f03e4024a9456",
+      "measurement_source": "live",
+      "vram_pci_id": "1002:73BF",
+      "vram_card": "card1",
+      "row_status": "pass",
+      "row_quality": {
+        "context_confirmed": true,
+        "device_confirmed": true,
+        "exact_completion": true,
+        "offload_confirmed": true,
+        "passed": true,
+        "stability_confirmed": true,
+        "timing_confirmed": true
+      }
+    },
+    "evidence_id": "42684fbf480e380a3c7285a3ebdb952c5e16805b1b58c8e4f79822ef7389a09a",
+    "lifecycle": {"started": true, "bounded": true, "finished": true}
   }
 }

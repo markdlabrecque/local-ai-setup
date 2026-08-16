@@ -17,13 +17,15 @@
   "context_tokens": 32768,
   "lifecycle": {
     "modes": ["cold", "warm"],
-    "cold": {"cache_miss": true, "new_process": true},
-    "warm": {"cache_hit": true, "new_process": true}
+    "warmup": false,
+    "cold": {"cache_miss": true, "new_process": true, "warmup": false},
+    "warm": {"cache_hit": true, "new_process": true, "warmup": false}
   },
   "timeout_seconds": 120,
   "cleanup": {"process_group": true, "term_grace_seconds": 0.2, "capture_bytes": 65536},
   "safety": {
     "selected_gpu": "Vulkan0",
+    "selected_pci_id": "1002:73BF",
     "minimum_free_vram_mib": 1024,
     "minimum_available_vram_mib": 1024,
     "minimum_available_ram_mib": 8192,
