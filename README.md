@@ -95,6 +95,13 @@ bounded sanitized artifacts, and the report contract in
 [`schemas/evaluation-report.schema.json`](schemas/evaluation-report.schema.json).
 See [`docs/issue-11-evaluation.md`](docs/issue-11-evaluation.md).
 
+## Issue #14 endurance and recovery
+
+The 13-minute real workload covered repeated Pi tools/reconnects, near-32K
+context, concurrent requests, cancellation, model cycles, service restart, and
+bounded memory pressure. See
+[`docs/issue-14-endurance.md`](docs/issue-14-endurance.md).
+
 ## Issue #13 production profile
 
 The selected profile is Q8_0 at 32K context with 20 Vulkan layers; no
