@@ -13,6 +13,10 @@ readonly MANIFEST_MARKER="# Managed by install-router-service.sh; ownership mani
 
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 [[ "$CONFIG_HOME" == /* && "$HOME" == /* ]] || die "HOME and XDG_CONFIG_HOME must be absolute paths"
+if [[ -n ${LOCAL_AI_TEST_HOOK:-} ]]; then
+  [[ ${LOCAL_AI_TEST_MODE:-0} == 1 ]] || die "test race hook requires LOCAL_AI_TEST_MODE=1"
+  [[ -x "$LOCAL_AI_TEST_HOOK" ]] || die "test race hook is not executable"
+fi
 
 # Inspect every existing parent with O_NOFOLLOW. Missing parents are harmless,
 # but an existing symlink anywhere below HOME or XDG_CONFIG_HOME is rejected.
@@ -92,6 +96,67 @@ PY
 }
 validate_manifest || die "refusing to uninstall artifacts that are not exactly installer-owned"
 
+# Hold the unit's parent directory while the lifecycle decision is made.  The
+# final path and content are checked again after the optional, explicitly gated
+# test hook, so a swapped artifact cannot turn an owned service into an
+# unowned one between validation and stop/disable.
+revalidate_before_lifecycle() {
+  python3 - "$UNIT_PATH" <<'PY'
+import hashlib, os, stat, subprocess, sys
+path = sys.argv[1]
+parent, name = os.path.split(path)
+fd = os.open("/", os.O_PATH | os.O_DIRECTORY)
+try:
+    for component in parent.split("/")[1:]:
+        if component in ("", ".", ".."):
+            raise SystemExit(f"unsafe lifecycle parent: {parent}")
+        nxt = os.open(component, os.O_PATH | os.O_DIRECTORY | os.O_NOFOLLOW,
+                      dir_fd=fd)
+        os.close(fd)
+        fd = nxt
+except BaseException:
+    os.close(fd)
+    raise
+
+def identity(st):
+    return (st.st_dev, st.st_ino, st.st_mode, st.st_size, st.st_mtime_ns)
+
+def state():
+    st = os.stat(name, dir_fd=fd, follow_symlinks=False)
+    if not stat.S_ISREG(st.st_mode):
+        raise SystemExit(f"unowned lifecycle target: {path}")
+    handle = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=fd)
+    try:
+        before = os.fstat(handle)
+        digest = hashlib.sha256()
+        while chunk := os.read(handle, 1024 * 1024):
+            digest.update(chunk)
+        after = os.fstat(handle)
+        if identity(before) != identity(after):
+            raise SystemExit(f"lifecycle target changed while hashing: {path}")
+        return identity(after), digest.hexdigest()
+    finally:
+        os.close(handle)
+
+def parent_is_same():
+    visible = os.stat(parent, follow_symlinks=False)
+    held = os.fstat(fd)
+    return stat.S_ISDIR(visible.st_mode) and identity(visible)[:2] == identity(held)[:2]
+
+before = state()
+hook = os.environ.get("LOCAL_AI_TEST_HOOK")
+if hook:
+    if os.environ.get("LOCAL_AI_TEST_MODE") != "1":
+        raise SystemExit("test race hook requires LOCAL_AI_TEST_MODE=1")
+    subprocess.run([hook, "before-stop-disable", path], check=True)
+if not parent_is_same() or state() != before:
+    raise SystemExit(f"lifecycle ownership changed: {path}")
+os.close(fd)
+PY
+}
+revalidate_before_lifecycle || die "ownership changed before service lifecycle action"
+validate_manifest || die "ownership changed before service lifecycle action"
+
 systemctl_user() {
   command -v systemctl >/dev/null 2>&1 || die "systemctl is required"
   command -v timeout >/dev/null 2>&1 || die "timeout is required for bounded systemctl calls"
@@ -105,11 +170,56 @@ systemctl_user disable "$SERVICE_NAME" || true
 
 remove_exact() {
   python3 - "$@" <<'PY'
-import os, sys
+import hashlib, os, stat, subprocess, sys
 for path in sys.argv[1:]:
     parent, name = os.path.split(path)
-    fd = os.open(parent, os.O_PATH | os.O_DIRECTORY | os.O_NOFOLLOW)
+    fd = os.open("/", os.O_PATH | os.O_DIRECTORY)
     try:
+        for component in parent.split("/")[1:]:
+            if component in ("", ".", ".."):
+                raise SystemExit(f"unsafe removal parent: {parent}")
+            nxt = os.open(component, os.O_PATH | os.O_DIRECTORY | os.O_NOFOLLOW,
+                          dir_fd=fd)
+            os.close(fd)
+            fd = nxt
+    except BaseException:
+        os.close(fd)
+        raise
+
+    def identity(st):
+        return (st.st_dev, st.st_ino, st.st_mode, st.st_size, st.st_mtime_ns)
+
+    def state():
+        st = os.stat(name, dir_fd=fd, follow_symlinks=False)
+        if not stat.S_ISREG(st.st_mode):
+            raise SystemExit(f"refusing unsafe removal target: {path}")
+        handle = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=fd)
+        try:
+            before = os.fstat(handle)
+            digest = hashlib.sha256()
+            while chunk := os.read(handle, 1024 * 1024):
+                digest.update(chunk)
+            after = os.fstat(handle)
+            if identity(before) != identity(after):
+                raise SystemExit(f"target changed while hashing: {path}")
+            return identity(after), digest.hexdigest()
+        finally:
+            os.close(handle)
+
+    def parent_is_same():
+        visible = os.stat(parent, follow_symlinks=False)
+        held = os.fstat(fd)
+        return stat.S_ISDIR(visible.st_mode) and identity(visible)[:2] == identity(held)[:2]
+
+    try:
+        before = state()
+        hook = os.environ.get("LOCAL_AI_TEST_HOOK")
+        if hook:
+            if os.environ.get("LOCAL_AI_TEST_MODE") != "1":
+                raise SystemExit("test race hook requires LOCAL_AI_TEST_MODE=1")
+            subprocess.run([hook, "before-remove", path], check=True)
+        if not parent_is_same() or state() != before:
+            raise SystemExit(f"removal ownership changed: {path}")
         os.unlink(name, dir_fd=fd)
     finally:
         os.close(fd)

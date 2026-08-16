@@ -514,7 +514,7 @@ class Issue8SystemdService(unittest.TestCase):
             unit, _envs = self.installed_paths(root)
             outside = root / "outside"
             outside.mkdir()
-            (outside / "sentinel").write_text("outside sentinel\\n")
+            (outside / "sentinel").write_text("outside sentinel\n")
             before = {p.relative_to(outside).as_posix(): p.read_bytes()
                       for p in outside.rglob("*") if p.is_file()}
             environment, log = self.race_env(
@@ -537,7 +537,7 @@ class Issue8SystemdService(unittest.TestCase):
             unit, _envs = self.installed_paths(root)
             outside = root / "outside"
             outside.mkdir()
-            (outside / "sentinel").write_text("outside sentinel\\n")
+            (outside / "sentinel").write_text("outside sentinel\n")
             before = {p.relative_to(outside).as_posix(): p.read_bytes()
                       for p in outside.rglob("*") if p.is_file()}
             environment, log = self.race_env(
@@ -565,7 +565,7 @@ class Issue8SystemdService(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0,
                                 "installer replaced a destination changed after validation")
             self.assertIn(f"before-replace {unit.absolute()}", log.read_text().splitlines())
-            self.assertEqual(unit.read_text(), "unowned race replacement\\n",
+            self.assertEqual(unit.read_text(), "unowned race replacement\n",
                              "installer overwrote the raced unowned destination")
 
     def test_uninstaller_revalidates_destination_inode_and_hash_before_remove(self):
@@ -581,7 +581,7 @@ class Issue8SystemdService(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0,
                                 "uninstaller removed a destination changed after validation")
             self.assertIn(f"before-remove {unit.absolute()}", log.read_text().splitlines())
-            self.assertEqual(unit.read_text(), "unowned race replacement\\n",
+            self.assertEqual(unit.read_text(), "unowned race replacement\n",
                              "uninstaller removed the raced unowned destination")
 
     def test_uninstaller_revalidates_ownership_before_stop_and_disable(self):
@@ -597,7 +597,7 @@ class Issue8SystemdService(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0,
                                 "uninstaller controlled a service after ownership changed")
             self.assertIn(f"before-stop-disable {unit.absolute()}", log.read_text().splitlines())
-            self.assertEqual(unit.read_text(), "unowned race replacement\\n")
+            self.assertEqual(unit.read_text(), "unowned race replacement\n")
             systemctl_log = root / "systemctl.jsonl"
             calls = systemctl_log.read_text() if systemctl_log.exists() else ""
             self.assertNotRegex(calls, r'"stop"|"disable"',

@@ -34,11 +34,11 @@ expansion is not used.
 The service is localhost-only through the Issue #7 launcher, uses a private
 `PrivateTmp`, `NoNewPrivileges`, a control-group kill mode, a 30-second stop
 timeout, and bounded `on-failure` restarts (five starts in five minutes).
-`MemoryHigh=68719476736`, `MemoryMax=73014444032`, and
-`MemorySwapMax=103079215104` are finite byte values (64, 68, and 96 GiB),
-using systemd's unambiguous byte grammar. They retain the measured Q8_0
-baseline headroom and keep swap materially below the host total while putting
-a finite ceiling on a failed load. No model is autoloaded by the unit.
+`MemoryHigh=51539607552`, `MemoryMax=60129542144`, and
+`MemorySwapMax=8589934592` are finite systemd byte values (48, 56, and 8
+GiB). They admit the measured Q8_0 baseline (>27.5 GiB), keep the hard cap
+below 60 GiB, preserve at least an 8 GiB host reserve, and bound swap at 8
+GiB. No model is autoloaded by the unit.
 
 ## Operate
 

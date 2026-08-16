@@ -51,6 +51,10 @@ done
 [[ -f "$PROJECT_ROOT/scripts/run-router.sh" && -x "$PROJECT_ROOT/scripts/run-router.sh" ]] ||
   die "Issue #7 launcher is not an executable regular file"
 [[ "$CONFIG_HOME" == /* && "$HOME" == /* ]] || die "HOME and XDG_CONFIG_HOME must be absolute paths"
+if [[ -n ${LOCAL_AI_TEST_HOOK:-} ]]; then
+  [[ ${LOCAL_AI_TEST_MODE:-0} == 1 ]] || die "test race hook requires LOCAL_AI_TEST_MODE=1"
+  [[ -x "$LOCAL_AI_TEST_HOOK" ]] || die "test race hook is not executable"
+fi
 
 # Directory creation and traversal use directory descriptors opened with
 # O_NOFOLLOW. This rejects an existing symlinked component rather than letting
@@ -208,29 +212,89 @@ fi
 atomic_write() {
   local destination=$1 mode=$2 content=$3
   python3 - "$destination" "$mode" "$content" <<'PY'
-import os, stat, sys, uuid
+import hashlib, os, stat, subprocess, sys, uuid
 path, mode, content = sys.argv[1], int(sys.argv[2], 8), sys.argv[3].encode()
 parent, name = os.path.split(path)
-fd = os.open(parent, os.O_PATH | os.O_DIRECTORY | os.O_NOFOLLOW)
-temp = f".{name}.tmp-{os.getpid()}-{uuid.uuid4().hex}"
+
+# Walk the parent one component at a time and retain the final directory fd.
+# No path-based operation below can be redirected by a swapped ancestor.
+parts = parent.split("/")[1:]
+fd = os.open("/", os.O_PATH | os.O_DIRECTORY)
 try:
+    for component in parts:
+        if component in ("", ".", ".."):
+            raise SystemExit(f"unsafe destination parent: {parent}")
+        nxt = os.open(component, os.O_PATH | os.O_DIRECTORY | os.O_NOFOLLOW,
+                      dir_fd=fd)
+        os.close(fd)
+        fd = nxt
+except BaseException:
+    os.close(fd)
+    raise
+
+temp = f".{name}.tmp-{os.getpid()}-{uuid.uuid4().hex}"
+def identity(st):
+    return (st.st_dev, st.st_ino, st.st_mode, st.st_size, st.st_mtime_ns)
+
+def state():
     try:
-        current = os.lstat(name, dir_fd=fd)
-        if stat.S_ISLNK(current.st_mode) or not stat.S_ISREG(current.st_mode):
-            raise SystemExit(f"refusing unsafe destination: {path}")
+        first = os.stat(name, dir_fd=fd, follow_symlinks=False)
     except FileNotFoundError:
-        pass
-    out = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode, dir_fd=fd)
+        return None
+    if not stat.S_ISREG(first.st_mode):
+        raise SystemExit(f"refusing unsafe destination: {path}")
+    handle = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=fd)
     try:
-        os.write(out, content)
+        checked = os.fstat(handle)
+        if identity(first) != identity(checked):
+            raise SystemExit(f"destination changed while reading: {path}")
+        digest = hashlib.sha256()
+        while True:
+            chunk = os.read(handle, 1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+        final = os.fstat(handle)
+        if identity(checked) != identity(final):
+            raise SystemExit(f"destination changed while hashing: {path}")
+        return identity(final), digest.hexdigest()
+    finally:
+        os.close(handle)
+
+def parent_is_same():
+    visible = os.stat(parent, follow_symlinks=False)
+    held = os.fstat(fd)
+    return stat.S_ISDIR(visible.st_mode) and identity(visible)[:2] == identity(held)[:2]
+
+before = state()
+hook = os.environ.get("LOCAL_AI_TEST_HOOK")
+if hook:
+    if os.environ.get("LOCAL_AI_TEST_MODE") != "1":
+        raise SystemExit("test race hook requires LOCAL_AI_TEST_MODE=1")
+    subprocess.run([hook, "before-replace", path], check=True)
+if not parent_is_same():
+    raise SystemExit(f"destination parent changed: {path}")
+after = state()
+if after != before:
+    raise SystemExit(f"destination ownership changed: {path}")
+try:
+    out = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                  mode, dir_fd=fd)
+    try:
+        view = memoryview(content)
+        while view:
+            written = os.write(out, view)
+            view = view[written:]
         os.fchmod(out, mode)
         os.fsync(out)
     finally:
         os.close(out)
     os.replace(temp, name, src_dir_fd=fd, dst_dir_fd=fd)
 finally:
-    try: os.unlink(temp, dir_fd=fd)
-    except FileNotFoundError: pass
+    try:
+        os.unlink(temp, dir_fd=fd)
+    except FileNotFoundError:
+        pass
     os.close(fd)
 PY
 }
