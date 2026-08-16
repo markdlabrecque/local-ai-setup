@@ -5,11 +5,13 @@ set -u
 usage() {
   printf 'Usage: %s --model FILE --sha256 HEX --llama-cli FILE [options]\n' "$0"
   printf 'Options: --prompt TEXT --expected-completion TEXT --context TOKENS\n'
-  printf '         --timeout SECONDS --gpu-layers N\n'
+  printf '         --timeout SECONDS --gpu-layers N --flash-attn on|off\n'
+  printf '         --batch-size N --ubatch-size N --cache-type-k q8_0 --cache-type-v q8_0\n'
   printf '         --max-stdout-bytes N --max-stderr-bytes N --output FILE\n'
 }
 model=''; expected_sha=''; cli=''; prompt='Say hello in one short sentence.'
 context=32768; timeout_seconds=300; output=''; expected_completion=''; gpu_layers="${BASELINE_GPU_LAYERS:-20}"
+flash_attention='on'; batch_size=256; ubatch_size=128; cache_type_k='q8_0'; cache_type_v='q8_0'
 max_stdout_bytes="${BASELINE_MAX_STDOUT_BYTES:-1048576}"
 max_stderr_bytes="${BASELINE_MAX_STDERR_BYTES:-4194304}"
 while (($#)); do
@@ -22,6 +24,11 @@ while (($#)); do
     --context) (($# >= 2)) || { usage >&2; exit 2; }; context=$2; shift 2 ;;
     --timeout) (($# >= 2)) || { usage >&2; exit 2; }; timeout_seconds=$2; shift 2 ;;
     --gpu-layers) (($# >= 2)) || { usage >&2; exit 2; }; gpu_layers=$2; shift 2 ;;
+    --flash-attn) (($# >= 2)) || { usage >&2; exit 2; }; flash_attention=$2; shift 2 ;;
+    --batch-size) (($# >= 2)) || { usage >&2; exit 2; }; batch_size=$2; shift 2 ;;
+    --ubatch-size) (($# >= 2)) || { usage >&2; exit 2; }; ubatch_size=$2; shift 2 ;;
+    --cache-type-k) (($# >= 2)) || { usage >&2; exit 2; }; cache_type_k=$2; shift 2 ;;
+    --cache-type-v) (($# >= 2)) || { usage >&2; exit 2; }; cache_type_v=$2; shift 2 ;;
     --max-stdout-bytes|--stdout-max-bytes) (($# >= 2)) || { usage >&2; exit 2; }; max_stdout_bytes=$2; shift 2 ;;
     --max-stderr-bytes|--stderr-max-bytes) (($# >= 2)) || { usage >&2; exit 2; }; max_stderr_bytes=$2; shift 2 ;;
     --output) (($# >= 2)) || { usage >&2; exit 2; }; output=$2; shift 2 ;;
@@ -32,7 +39,11 @@ done
 [[ -n "$model" && -n "$expected_sha" && -n "$cli" && -n "$output" ]] || { usage >&2; exit 2; }
 [[ -r "$model" ]] || { printf 'model is not readable\n' >&2; exit 1; }
 [[ "$expected_sha" =~ ^[[:xdigit:]]{64}$ ]] || { printf 'invalid SHA-256\n' >&2; exit 2; }
-[[ "$context" =~ ^[0-9]+$ && "$context" -eq 32768 ]] || { printf 'context must be exactly 32768\n' >&2; exit 2; }
+[[ "$context" =~ ^[0-9]+$ && "$context" -ge 32768 ]] || { printf 'context must be at least 32768\n' >&2; exit 2; }
+[[ "$flash_attention" == on || "$flash_attention" == off ]] || { printf 'invalid flash attention setting\n' >&2; exit 2; }
+[[ "$batch_size" =~ ^[0-9]+$ && "$batch_size" -gt 0 ]] || { printf 'invalid batch size\n' >&2; exit 2; }
+[[ "$ubatch_size" =~ ^[0-9]+$ && "$ubatch_size" -gt 0 ]] || { printf 'invalid ubatch size\n' >&2; exit 2; }
+[[ "$cache_type_k" == q8_0 && "$cache_type_v" == q8_0 ]] || { printf 'KV cache must be q8_0 for both K and V\n' >&2; exit 2; }
 [[ "$timeout_seconds" =~ ^[0-9]+([.][0-9]+)?$ ]] || { printf 'invalid timeout\n' >&2; exit 2; }
 awk -v timeout="$timeout_seconds" 'BEGIN {exit !(timeout > 0)}' || { printf 'timeout must be greater than zero\n' >&2; exit 2; }
 [[ "$gpu_layers" =~ ^[0-9]+$ ]] || { printf 'invalid GPU layers\n' >&2; exit 2; }
@@ -99,10 +110,10 @@ python3 "$capper" "$stderr_fifo" "$stderr_file" "$max_stderr_bytes" "$tmp/stderr
 
 # --simple-io keeps the stream machine-readable (no interactive banner or UI), while
 # --single-turn and --no-display-prompt make this a deterministic one-shot prompt.
-run_args=(--model "$model" --ctx-size 32768 --device Vulkan0 --gpu-layers "$gpu_layers" --flash-attn on --reasoning off --temp 0 --seed 42 --single-turn --simple-io --verbose --no-display-prompt --prompt "$prompt" --n-predict 128)
+run_args=(--model "$model" --ctx-size "$context" --device Vulkan0 --gpu-layers "$gpu_layers" --flash-attn "$flash_attention" --batch-size "$batch_size" --ubatch-size "$ubatch_size" --cache-type-k "$cache_type_k" --cache-type-v "$cache_type_v" --reasoning off --temp 0 --seed 42 --single-turn --simple-io --verbose --no-display-prompt --prompt "$prompt" --n-predict 128)
 measure_file=$tmp/measure.json
 sysfs_root=${BASELINE_SYSFS_ROOT:-/sys}
-target_vram_file=''; target_vram_card='unavailable'; target_vram_pci_id='unavailable'
+target_vram_file=''; target_vram_capacity='unavailable'; target_vram_card='unavailable'; target_vram_pci_id='unavailable'
 for card_device in "$sysfs_root"/class/drm/card*/device; do
   [[ -d "$card_device" ]] || continue
   card_name=$(basename "${card_device%/device}")
@@ -115,6 +126,8 @@ for card_device in "$sysfs_root"/class/drm/card*/device; do
   fi
   if [[ "$pci" == '1002:73BF' ]]; then
     target_vram_file="$card_device/mem_info_vram_used"
+    total_bytes=$(awk '{print $1; exit}' "$card_device/mem_info_vram_total" 2>/dev/null || true)
+    [[ "$total_bytes" =~ ^[0-9]+$ ]] && target_vram_capacity=$((total_bytes / 1024 / 1024))
     target_vram_card=$(basename "${card_device%/device}")
     target_vram_pci_id=$pci
     break
@@ -190,7 +203,7 @@ wait "$stdout_cap_pid" 2>/dev/null; wait "$stderr_cap_pid" 2>/dev/null
 set -e
 [[ -f "$tmp/timed_out" ]] && timed_out=true || timed_out=false
 measurements=$(python3 -c 'import json,sys; print(json.dumps(json.load(open(sys.argv[1]))))' "$measure_file" 2>/dev/null || printf '{"ram_mib":null,"vram_mib":null,"swap_mib":null}')
-export model cli cli_version prompt expected_completion context timeout_seconds actual_sha expected_sha status timed_out output measurements stdout_file stderr_file gpu_layers max_stdout_bytes max_stderr_bytes target_vram_card target_vram_pci_id BASELINE_SYSFS_ROOT="${BASELINE_SYSFS_ROOT:-}" STDOUT_EVIDENCE_FILE="$tmp/stdout.evidence.json"
+export model cli cli_version prompt expected_completion context timeout_seconds actual_sha expected_sha status timed_out output measurements stdout_file stderr_file gpu_layers flash_attention batch_size ubatch_size cache_type_k cache_type_v max_stdout_bytes max_stderr_bytes target_vram_capacity target_vram_card target_vram_pci_id BASELINE_SYSFS_ROOT="${BASELINE_SYSFS_ROOT:-}" STDOUT_EVIDENCE_FILE="$tmp/stdout.evidence.json"
 python3 - <<'PY'
 import json, os, pathlib, re
 
@@ -211,7 +224,7 @@ combined = stdout + "\n" + stderr
 # Do not accept a generic Vulkan banner: the target adapter must be identified.
 device = next((clean(x.strip()) for x in combined.splitlines()
                if re.search(r'(?i)vulkan', x) and re.search(r'(?i)RX[ -]?6900', x)), 'unavailable')
-ctx_match = re.search(r'(?i)(?:n_ctx|context(?: size| tokens)?)[^0-9]{0,20}(32768)', combined)
+ctx_match = re.search(r'(?i)(?:n_ctx|context(?: size| tokens)?)[^0-9]{0,20}(' + re.escape(os.environ['context']) + r')', combined)
 confirmed_context = bool(ctx_match)
 stop_match = re.search(r'(?i)stop reason\s*[:=]\s*([^\s]+)', combined)
 stop = clean(stop_match.group(1)) if stop_match else 'unknown'
@@ -230,6 +243,14 @@ else:
 # small fake fixture used by the portable gate).
 timing_match = re.search(r'(?im)(?:prompt eval|eval|total).*?(?:time|t/s|tokens?/s)', combined)
 timing_evidence = bool(timing_match)
+def timing_metric(kind):
+    line = next((x for x in combined.splitlines() if re.search(kind, x, re.I)), '')
+    ms = re.search(r'=\s*([0-9]+(?:\.[0-9]+)?)\s*ms', line, re.I)
+    tokens = re.search(r'/\s*([0-9]+)\s*(?:tokens?|runs?)', line, re.I)
+    tps = re.findall(r'([0-9]+(?:\.[0-9]+)?)\s*(?:tokens?/s|tokens?\s+per\s+second)', line, re.I)
+    return (float(ms.group(1)) if ms else None, int(tokens.group(1)) if tokens else None, float(tps[-1]) if tps else None)
+prompt_timing = timing_metric(r'prompt\s+eval')
+generation_timing = timing_metric(r'(?<!prompt\s)eval\s+time')
 # With --simple-io stdout is the completion stream. Remove recognizable CLI
 # banner lines before checking it, so an exit-0 UI/banner-only run is rejected.
 ui_line = re.compile(r'(?i)^\s*(?:llama[- ]?cli(?:\s+version)?|build info|system[_ ]info|sampling|command|prompt|main|input)\s*[:=]|^\s*>\s*')
@@ -257,9 +278,10 @@ exact_terminal = bool(expected_indexes) and not any(
     line and not terminal_noise.match(line) for line in stdout_lines[expected_indexes[-1] + 1:]
 )
 cleaned_final = clean(final_response)
-expected_match = (not expected_clean and bool(cleaned_final)) or (bool(expected_clean) and exact_terminal)
-completion = expected_clean if expected_clean and expected_match else cleaned_final
-response_chunks = [expected_clean] if expected_clean and expected_match else [clean(x.strip()) for x in final_response.splitlines() if x.strip()]
+expected_match = ((not expected_clean and bool(cleaned_final)) or
+                  (bool(expected_clean) and exact_terminal and cleaned_final == expected_clean))
+completion = cleaned_final
+response_chunks = [clean(x.strip()) for x in final_response.splitlines() if x.strip()]
 # Preserve observed FIFO read boundaries and timestamps instead of claiming
 # that post-processed output lines are transport chunks.
 try: chunk_evidence = json.loads(pathlib.Path(os.environ['STDOUT_EVIDENCE_FILE']).read_text())
@@ -294,8 +316,8 @@ vram_pci_id = os.environ.get('target_vram_pci_id', 'unavailable')
 # unambiguous PCI association used for its VRAM counter.
 if device != 'unavailable' and vram_pci_id == '1002:73BF':
     vram_device = 'AMD Radeon RX 6900 XT'
-cmd = ['llama-cli', '--model', pathlib.Path(os.environ['model']).name, '--ctx-size', '32768', '--device', 'Vulkan0', '--gpu-layers', os.environ['gpu_layers'], '--flash-attn', 'on', '--reasoning', 'off', '--temp', '0', '--seed', '42', '--single-turn', '--simple-io', '--verbose', '--no-display-prompt', '--prompt', clean(os.environ['prompt']), '--n-predict', '128']
-result = {'schema_version': 1, 'model': pathlib.Path(os.environ['model']).name, 'model_sha256': os.environ['actual_sha'], 'llama_cpp': {'release': 'b10446', 'commit': 'adb55e5', 'version_output': clean(os.environ['cli_version'])}, 'command': cmd, 'device': device, 'context_tokens': 32768, 'context_confirmed': confirmed_context, 'gpu_layers': int(os.environ['gpu_layers']), 'offload_evidence': offload_evidence, 'reasoning_mode': 'off', 'expected_completion': expected_clean, 'expected_completion_match': expected_match, 'final_section_confirmed': bool(completion) and expected_match, 'stream': {'completion': completion, 'chunks': chunks, 'response_chunks': response_chunks, 'chunk_evidence': chunk_evidence, 'capture_mode': 'fifo-read-boundaries', 'thinking': thinking, 'prompt': clean(prompt_text), 'enabled': bool(response_chunks and chunk_evidence)}, 'stop_reason': stop, 'stop_event': stop_event, 'timing_evidence': timing_evidence, 'vram_device': vram_device, 'vram_card': vram_card, 'vram_pci_id': vram_pci_id, 'measurement_source': measurement_source, 'swap_activity': {'peak_mib': swap_peak, 'system_used_peak_mib': system_swap_peak, 'pages_in': swap_in_pages, 'pages_out': swap_out_pages}, 'exit_code': int(os.environ['status']), 'timed_out': os.environ['timed_out'] == 'true', 'measurements': measurements, 'model_metadata': metadata, 'startup_log': clean(stderr), 'capture_limits': {'stdout_bytes': int(os.environ['max_stdout_bytes']), 'stderr_bytes': int(os.environ['max_stderr_bytes'])}}
+cmd = ['llama-cli', '--model', pathlib.Path(os.environ['model']).name, '--ctx-size', os.environ['context'], '--device', 'Vulkan0', '--gpu-layers', os.environ['gpu_layers'], '--flash-attn', os.environ['flash_attention'], '--batch-size', os.environ['batch_size'], '--ubatch-size', os.environ['ubatch_size'], '--cache-type-k', os.environ['cache_type_k'], '--cache-type-v', os.environ['cache_type_v'], '--reasoning', 'off', '--temp', '0', '--seed', '42', '--single-turn', '--simple-io', '--verbose', '--no-display-prompt', '--prompt', clean(os.environ['prompt']), '--n-predict', '128']
+result = {'schema_version': 1, 'model': pathlib.Path(os.environ['model']).name, 'model_sha256': os.environ['actual_sha'], 'llama_cpp': {'release': 'b10446', 'commit': 'adb55e5', 'version_output': clean(os.environ['cli_version'])}, 'command': cmd, 'device': device, 'context_tokens': int(os.environ['context']), 'context_confirmed': confirmed_context, 'gpu_layers': int(os.environ['gpu_layers']), 'offload_evidence': offload_evidence, 'reasoning_mode': 'off', 'expected_completion': expected_clean, 'expected_completion_match': expected_match, 'final_section_confirmed': bool(completion) and expected_match, 'stream': {'completion': completion, 'chunks': chunks, 'response_chunks': response_chunks, 'chunk_evidence': chunk_evidence, 'capture_mode': 'fifo-read-boundaries', 'thinking': thinking, 'prompt': clean(prompt_text), 'enabled': bool(response_chunks and chunk_evidence)}, 'stop_reason': stop, 'stop_event': stop_event, 'timing_evidence': timing_evidence, 'metrics': {'prompt_eval_ms': prompt_timing[0], 'prompt_tokens': prompt_timing[1], 'prompt_tokens_per_second': prompt_timing[2], 'generation_eval_ms': generation_timing[0], 'generation_tokens': generation_timing[1], 'generation_tokens_per_second': generation_timing[2]}, 'vram_device': vram_device, 'vram_card': vram_card, 'vram_pci_id': vram_pci_id, 'measurement_source': measurement_source, 'vram_capacity_mib': int(os.environ['target_vram_capacity']) if os.environ['target_vram_capacity'].isdigit() else None, 'swap_activity': {'peak_mib': swap_peak, 'system_used_peak_mib': system_swap_peak, 'pages_in': swap_in_pages, 'pages_out': swap_out_pages}, 'exit_code': int(os.environ['status']), 'timed_out': os.environ['timed_out'] == 'true', 'measurements': measurements, 'model_metadata': metadata, 'startup_log': clean(stderr), 'capture_limits': {'stdout_bytes': int(os.environ['max_stdout_bytes']), 'stderr_bytes': int(os.environ['max_stderr_bytes'])}}
 pathlib.Path(os.environ['output']).write_text(json.dumps(result, indent=2, sort_keys=True) + '\n')
 PY
 if [[ "$timed_out" == true || $status -ne 0 ]]; then exit 1; fi

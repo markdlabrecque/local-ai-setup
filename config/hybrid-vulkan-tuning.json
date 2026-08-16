@@ -1,0 +1,27 @@
+{
+  "schema_version": "hybrid-vulkan-tuning-v1",
+  "model": {
+    "id": "Qwen3.5-27B-Q8_0",
+    "sha256": "6b0a101b0a86697fe11eabcc1a7db72699a9f3d4b18b6a1ac75ea3fb2c26c450",
+    "quantization": "Q8_0"
+  },
+  "build": {"ref": "b10446", "commit": "adb55e5"},
+  "prompt": "Respond with exactly: LOCAL_AI_HYBRID_TUNING_OK",
+  "context_tokens": 32768,
+  "stability": {
+    "consecutive_requests": 3,
+    "long_context_canary_tokens": 32000
+  },
+  "matrix": {
+    "gpu_layers": [16, 20],
+    "flash_attention": ["on", "off"],
+    "batch": [256],
+    "ubatch": [128],
+    "kv_cache": ["q8_0"]
+  },
+  "safety": {
+    "minimum_vram_free_mib": 1024,
+    "minimum_mem_available_mib": 8192,
+    "maximum_swap_in_pages": 0
+  }
+}

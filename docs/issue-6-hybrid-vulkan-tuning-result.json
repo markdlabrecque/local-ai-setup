@@ -1,0 +1,718 @@
+{
+  "build": {
+    "commit": "adb55e5",
+    "ref": "b10446"
+  },
+  "context_tokens": 32768,
+  "matrix": {
+    "batch": [
+      256
+    ],
+    "flash_attention": [
+      "on",
+      "off"
+    ],
+    "gpu_layers": [
+      16,
+      20
+    ],
+    "kv_cache": [
+      "q8_0"
+    ],
+    "ubatch": [
+      128
+    ]
+  },
+  "model": {
+    "id": "Qwen3.5-27B-Q8_0",
+    "quantization": "Q8_0",
+    "sha256": "6b0a101b0a86697fe11eabcc1a7db72699a9f3d4b18b6a1ac75ea3fb2c26c450"
+  },
+  "prompt": "Respond with exactly: LOCAL_AI_HYBRID_TUNING_OK",
+  "resumability": {
+    "attempt_directory": "issue-6-hybrid-vulkan-tuning-result.json.attempts",
+    "config_id": "3bc4787e59d7511554cf0698f20669b3aa7b5efa07f19e9cf790bf401eee4724",
+    "config_sha256": "3bc4787e59d7511554cf0698f20669b3aa7b5efa07f19e9cf790bf401eee4724",
+    "key": "parameter_tuple"
+  },
+  "runs": [
+    {
+      "attempts": [
+        {
+          "attempt_id": "b8ed51182b09fe5381535cd707248a0bafd86134d81f0bbcfd09af38b40e836c.attempt-01",
+          "evidence": {
+            "context_observed": true,
+            "device_observed": "0.00.012.866 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 6900 XT (RADV NAVI21) (16368 MiB, 15404 MiB free)",
+            "measurement_source": "live",
+            "observed_command": "llama-cli --ctx-size 32768 --device Vulkan0 --gpu-layers 16 --flash-attn on --batch-size 256 --ubatch-size 128 --cache-type-k q8_0 --cache-type-v q8_0 --prompt-sha256 ac7d192329eadcd3e0a67996567e3f0608a1f627a44fabde257b5472c1c5c9df --prompt-tokens 4 --n-predict 128",
+            "offload_evidence": true,
+            "provenance": {
+              "cli": "bounded-live-capture",
+              "gpu": "/sys/class/drm",
+              "host": "/proc"
+            },
+            "vram_capacity_mib": 16368,
+            "vram_card": "card1",
+            "vram_pci_id": "1002:73BF"
+          },
+          "metrics": {
+            "exit_code": 0,
+            "generation_eval_ms": 3704.59,
+            "generation_tokens": 10,
+            "generation_tokens_per_second": 2.43,
+            "min_mem_available_mib": 54649,
+            "peak_vram_mib": 8520,
+            "prompt_eval_ms": 1308.52,
+            "prompt_tokens": 25,
+            "prompt_tokens_per_second": 19.11,
+            "swap_in_pages": 0,
+            "timed_out": false,
+            "vram_capacity_mib": 16368
+          },
+          "prompt_tokens": 25,
+          "quality": {
+            "context_confirmed": true,
+            "device_confirmed": true,
+            "exact_completion": true,
+            "offload_confirmed": true,
+            "passed": true,
+            "timing_confirmed": true
+          }
+        },
+        {
+          "attempt_id": "b8ed51182b09fe5381535cd707248a0bafd86134d81f0bbcfd09af38b40e836c.attempt-02",
+          "evidence": {
+            "context_observed": true,
+            "device_observed": "0.00.011.549 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 6900 XT (RADV NAVI21) (16368 MiB, 15406 MiB free)",
+            "measurement_source": "live",
+            "observed_command": "llama-cli --ctx-size 32768 --device Vulkan0 --gpu-layers 16 --flash-attn on --batch-size 256 --ubatch-size 128 --cache-type-k q8_0 --cache-type-v q8_0 --prompt-sha256 ac7d192329eadcd3e0a67996567e3f0608a1f627a44fabde257b5472c1c5c9df --prompt-tokens 4 --n-predict 128",
+            "offload_evidence": true,
+            "provenance": {
+              "cli": "bounded-live-capture",
+              "gpu": "/sys/class/drm",
+              "host": "/proc"
+            },
+            "vram_capacity_mib": 16368,
+            "vram_card": "card1",
+            "vram_pci_id": "1002:73BF"
+          },
+          "metrics": {
+            "exit_code": 0,
+            "generation_eval_ms": 3722.54,
+            "generation_tokens": 10,
+            "generation_tokens_per_second": 2.42,
+            "min_mem_available_mib": 54605,
+            "peak_vram_mib": 8520,
+            "prompt_eval_ms": 1330.22,
+            "prompt_tokens": 25,
+            "prompt_tokens_per_second": 18.79,
+            "swap_in_pages": 0,
+            "timed_out": false,
+            "vram_capacity_mib": 16368
+          },
+          "prompt_tokens": 25,
+          "quality": {
+            "context_confirmed": true,
+            "device_confirmed": true,
+            "exact_completion": true,
+            "offload_confirmed": true,
+            "passed": true,
+            "timing_confirmed": true
+          }
+        },
+        {
+          "attempt_id": "b8ed51182b09fe5381535cd707248a0bafd86134d81f0bbcfd09af38b40e836c.attempt-03",
+          "evidence": {
+            "context_observed": true,
+            "device_observed": "0.00.012.116 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 6900 XT (RADV NAVI21) (16368 MiB, 15406 MiB free)",
+            "measurement_source": "live",
+            "observed_command": "llama-cli --ctx-size 32768 --device Vulkan0 --gpu-layers 16 --flash-attn on --batch-size 256 --ubatch-size 128 --cache-type-k q8_0 --cache-type-v q8_0 --prompt-sha256 d5b14aeedeb3d55b16b25dda788be3e5003ebb9d423ad6d6f43e54019c3bdc01 --prompt-tokens 32004 --n-predict 128",
+            "offload_evidence": true,
+            "provenance": {
+              "cli": "bounded-live-capture",
+              "gpu": "/sys/class/drm",
+              "host": "/proc"
+            },
+            "vram_capacity_mib": 16368,
+            "vram_card": "card1",
+            "vram_pci_id": "1002:73BF"
+          },
+          "metrics": {
+            "exit_code": 0,
+            "generation_eval_ms": 4813.23,
+            "generation_tokens": 10,
+            "generation_tokens_per_second": 1.87,
+            "min_mem_available_mib": 54428,
+            "peak_vram_mib": 8552,
+            "prompt_eval_ms": 419905.84,
+            "prompt_tokens": 32025,
+            "prompt_tokens_per_second": 76.27,
+            "swap_in_pages": 0,
+            "timed_out": false,
+            "vram_capacity_mib": 16368
+          },
+          "prompt_tokens": 32025,
+          "quality": {
+            "context_confirmed": true,
+            "device_confirmed": true,
+            "exact_completion": true,
+            "offload_confirmed": true,
+            "passed": true,
+            "timing_confirmed": true
+          }
+        }
+      ],
+      "config_id": "3bc4787e59d7511554cf0698f20669b3aa7b5efa07f19e9cf790bf401eee4724",
+      "evidence": {
+        "attempt_count": 3,
+        "attempt_ids": [
+          "b8ed51182b09fe5381535cd707248a0bafd86134d81f0bbcfd09af38b40e836c.attempt-01",
+          "b8ed51182b09fe5381535cd707248a0bafd86134d81f0bbcfd09af38b40e836c.attempt-02",
+          "b8ed51182b09fe5381535cd707248a0bafd86134d81f0bbcfd09af38b40e836c.attempt-03"
+        ],
+        "attempts_digest": "2a3177b972648a365051a282a4c169f287101bdb7629f0834faa3654769e9880",
+        "context_observed": true,
+        "device_observed": "0.00.012.116 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 6900 XT (RADV NAVI21) (16368 MiB, 15406 MiB free)",
+        "long_context_canary": true,
+        "measurement_source": "live",
+        "observed_command": "llama-cli --ctx-size 32768 --device Vulkan0 --gpu-layers 16 --flash-attn on --batch-size 256 --ubatch-size 128 --cache-type-k q8_0 --cache-type-v q8_0 --prompt-sha256 d5b14aeedeb3d55b16b25dda788be3e5003ebb9d423ad6d6f43e54019c3bdc01 --prompt-tokens 32004 --n-predict 128",
+        "offload_evidence": true,
+        "provenance": {
+          "cli": "bounded-live-capture",
+          "gpu": "/sys/class/drm",
+          "host": "/proc"
+        },
+        "row_metrics": {
+          "exit_code": 0,
+          "generation_eval_ms": 4080.1200000000003,
+          "generation_tokens": 10,
+          "generation_tokens_per_second": 2.24,
+          "min_mem_available_mib": 54428,
+          "peak_vram_mib": 8552,
+          "prompt_eval_ms": 140848.19333333333,
+          "prompt_tokens": 32025,
+          "prompt_tokens_per_second": 38.056666666666665,
+          "swap_in_pages": 0,
+          "swap_out_pages": null,
+          "timed_out": false,
+          "vram_capacity_mib": 16368
+        },
+        "row_quality": {
+          "context_confirmed": true,
+          "device_confirmed": true,
+          "exact_completion": true,
+          "passed": true,
+          "stability_confirmed": true,
+          "timing_confirmed": true
+        },
+        "row_status": "pass",
+        "vram_capacity_mib": 16368,
+        "vram_card": "card1",
+        "vram_pci_id": "1002:73BF"
+      },
+      "evidence_id": "32daedb9c2ac951986551f473e53cdfc38869c6acbcfb4159f26a7b0c53be5f5",
+      "lifecycle": {
+        "bounded": true,
+        "finished": true,
+        "started": true
+      },
+      "metrics": {
+        "exit_code": 0,
+        "generation_eval_ms": 4080.1200000000003,
+        "generation_tokens": 10,
+        "generation_tokens_per_second": 2.24,
+        "min_mem_available_mib": 54428,
+        "peak_vram_mib": 8552,
+        "prompt_eval_ms": 140848.19333333333,
+        "prompt_tokens": 32025,
+        "prompt_tokens_per_second": 38.056666666666665,
+        "swap_in_pages": 0,
+        "swap_out_pages": null,
+        "timed_out": false,
+        "vram_capacity_mib": 16368
+      },
+      "parameters": {
+        "batch": 256,
+        "flash_attention": "on",
+        "gpu_layers": 16,
+        "kv_cache": "q8_0",
+        "quantization": "Q8_0",
+        "ubatch": 128
+      },
+      "quality": {
+        "context_confirmed": true,
+        "device_confirmed": true,
+        "exact_completion": true,
+        "passed": true,
+        "stability_confirmed": true,
+        "timing_confirmed": true
+      },
+      "schema_version": "hybrid-vulkan-tuning-v1",
+      "status": "pass",
+      "tuple_id": "b8ed51182b09fe5381535cd707248a0bafd86134d81f0bbcfd09af38b40e836c"
+    },
+    {
+      "attempts": [
+        {
+          "attempt_id": "677363e71fd9489e2775215edf06623bd1a1105ff4d096614c6b386ff99d5f7f.attempt-01",
+          "evidence": {
+            "context_observed": false,
+            "device_observed": "0.00.012.403 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 6900 XT (RADV NAVI21) (16368 MiB, 15404 MiB free)",
+            "failure_reason": "quantized V cache requires flash_attn to be enabled",
+            "measurement_source": "live",
+            "observed_command": "llama-cli --ctx-size 32768 --device Vulkan0 --gpu-layers 16 --flash-attn off --batch-size 256 --ubatch-size 128 --cache-type-k q8_0 --cache-type-v q8_0 --prompt-sha256 ac7d192329eadcd3e0a67996567e3f0608a1f627a44fabde257b5472c1c5c9df --prompt-tokens 4 --n-predict 128",
+            "offload_evidence": true,
+            "provenance": {
+              "cli": "bounded-live-capture",
+              "gpu": "/sys/class/drm",
+              "host": "/proc"
+            },
+            "vram_capacity_mib": 16368,
+            "vram_card": "card1",
+            "vram_pci_id": "1002:73BF"
+          },
+          "metrics": {
+            "exit_code": 1,
+            "generation_eval_ms": null,
+            "generation_tokens": null,
+            "generation_tokens_per_second": null,
+            "min_mem_available_mib": 55703,
+            "peak_vram_mib": 8034,
+            "prompt_eval_ms": null,
+            "prompt_tokens": null,
+            "prompt_tokens_per_second": null,
+            "swap_in_pages": 0,
+            "timed_out": false,
+            "vram_capacity_mib": 16368
+          },
+          "prompt_tokens": null,
+          "quality": {
+            "context_confirmed": false,
+            "device_confirmed": true,
+            "exact_completion": false,
+            "offload_confirmed": true,
+            "passed": false,
+            "timing_confirmed": false
+          }
+        }
+      ],
+      "config_id": "3bc4787e59d7511554cf0698f20669b3aa7b5efa07f19e9cf790bf401eee4724",
+      "evidence": {
+        "attempts_digest": "828224413eb9d6c8ddf59f3cc58e3c10eac636506bea2337593bf7f3987d5987",
+        "context_observed": false,
+        "device_observed": "0.00.012.403 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 6900 XT (RADV NAVI21) (16368 MiB, 15404 MiB free)",
+        "failure_reason": "quantized V cache requires flash_attn to be enabled",
+        "measurement_source": "live",
+        "observed_command": "llama-cli --ctx-size 32768 --device Vulkan0 --gpu-layers 16 --flash-attn off --batch-size 256 --ubatch-size 128 --cache-type-k q8_0 --cache-type-v q8_0 --prompt-sha256 ac7d192329eadcd3e0a67996567e3f0608a1f627a44fabde257b5472c1c5c9df --prompt-tokens 4 --n-predict 128",
+        "offload_evidence": true,
+        "provenance": {
+          "cli": "bounded-live-capture",
+          "gpu": "/sys/class/drm",
+          "host": "/proc"
+        },
+        "row_metrics": {
+          "exit_code": 1,
+          "timed_out": false
+        },
+        "row_quality": {
+          "context_confirmed": false,
+          "device_confirmed": true,
+          "exact_completion": false,
+          "offload_confirmed": true,
+          "passed": false,
+          "timing_confirmed": false
+        },
+        "row_status": "incompatible",
+        "vram_capacity_mib": 16368,
+        "vram_card": "card1",
+        "vram_pci_id": "1002:73BF"
+      },
+      "evidence_id": "744eac111baea69df7e3310090d669ebc1b6d80e6f9fe791d838440c9441a38b",
+      "lifecycle": {
+        "bounded": true,
+        "finished": true,
+        "started": true
+      },
+      "metrics": {
+        "exit_code": 1,
+        "timed_out": false
+      },
+      "parameters": {
+        "batch": 256,
+        "flash_attention": "off",
+        "gpu_layers": 16,
+        "kv_cache": "q8_0",
+        "quantization": "Q8_0",
+        "ubatch": 128
+      },
+      "quality": {
+        "context_confirmed": false,
+        "device_confirmed": true,
+        "exact_completion": false,
+        "offload_confirmed": true,
+        "passed": false,
+        "timing_confirmed": false
+      },
+      "schema_version": "hybrid-vulkan-tuning-v1",
+      "status": "incompatible",
+      "tuple_id": "677363e71fd9489e2775215edf06623bd1a1105ff4d096614c6b386ff99d5f7f"
+    },
+    {
+      "attempts": [
+        {
+          "attempt_id": "86535f788b85182129f52059c677a511e5ad44f9f7c4c156f703b0547b8130da.attempt-01",
+          "evidence": {
+            "context_observed": true,
+            "device_observed": "0.00.012.950 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 6900 XT (RADV NAVI21) (16368 MiB, 15406 MiB free)",
+            "measurement_source": "live",
+            "observed_command": "llama-cli --ctx-size 32768 --device Vulkan0 --gpu-layers 20 --flash-attn on --batch-size 256 --ubatch-size 128 --cache-type-k q8_0 --cache-type-v q8_0 --prompt-sha256 ac7d192329eadcd3e0a67996567e3f0608a1f627a44fabde257b5472c1c5c9df --prompt-tokens 4 --n-predict 128",
+            "offload_evidence": true,
+            "provenance": {
+              "cli": "bounded-live-capture",
+              "gpu": "/sys/class/drm",
+              "host": "/proc"
+            },
+            "vram_capacity_mib": 16368,
+            "vram_card": "card1",
+            "vram_pci_id": "1002:73BF"
+          },
+          "metrics": {
+            "exit_code": 0,
+            "generation_eval_ms": 3532.5,
+            "generation_tokens": 10,
+            "generation_tokens_per_second": 2.55,
+            "min_mem_available_mib": 54646,
+            "peak_vram_mib": 10140,
+            "prompt_eval_ms": 1255.13,
+            "prompt_tokens": 25,
+            "prompt_tokens_per_second": 19.92,
+            "swap_in_pages": 0,
+            "timed_out": false,
+            "vram_capacity_mib": 16368
+          },
+          "prompt_tokens": 25,
+          "quality": {
+            "context_confirmed": true,
+            "device_confirmed": true,
+            "exact_completion": true,
+            "offload_confirmed": true,
+            "passed": true,
+            "timing_confirmed": true
+          }
+        },
+        {
+          "attempt_id": "86535f788b85182129f52059c677a511e5ad44f9f7c4c156f703b0547b8130da.attempt-02",
+          "evidence": {
+            "context_observed": true,
+            "device_observed": "0.00.012.882 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 6900 XT (RADV NAVI21) (16368 MiB, 15406 MiB free)",
+            "measurement_source": "live",
+            "observed_command": "llama-cli --ctx-size 32768 --device Vulkan0 --gpu-layers 20 --flash-attn on --batch-size 256 --ubatch-size 128 --cache-type-k q8_0 --cache-type-v q8_0 --prompt-sha256 ac7d192329eadcd3e0a67996567e3f0608a1f627a44fabde257b5472c1c5c9df --prompt-tokens 4 --n-predict 128",
+            "offload_evidence": true,
+            "provenance": {
+              "cli": "bounded-live-capture",
+              "gpu": "/sys/class/drm",
+              "host": "/proc"
+            },
+            "vram_capacity_mib": 16368,
+            "vram_card": "card1",
+            "vram_pci_id": "1002:73BF"
+          },
+          "metrics": {
+            "exit_code": 0,
+            "generation_eval_ms": 3530.37,
+            "generation_tokens": 10,
+            "generation_tokens_per_second": 2.55,
+            "min_mem_available_mib": 54592,
+            "peak_vram_mib": 10140,
+            "prompt_eval_ms": 1265.33,
+            "prompt_tokens": 25,
+            "prompt_tokens_per_second": 19.76,
+            "swap_in_pages": 0,
+            "timed_out": false,
+            "vram_capacity_mib": 16368
+          },
+          "prompt_tokens": 25,
+          "quality": {
+            "context_confirmed": true,
+            "device_confirmed": true,
+            "exact_completion": true,
+            "offload_confirmed": true,
+            "passed": true,
+            "timing_confirmed": true
+          }
+        },
+        {
+          "attempt_id": "86535f788b85182129f52059c677a511e5ad44f9f7c4c156f703b0547b8130da.attempt-03",
+          "evidence": {
+            "context_observed": true,
+            "device_observed": "0.00.012.322 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 6900 XT (RADV NAVI21) (16368 MiB, 15406 MiB free)",
+            "measurement_source": "live",
+            "observed_command": "llama-cli --ctx-size 32768 --device Vulkan0 --gpu-layers 20 --flash-attn on --batch-size 256 --ubatch-size 128 --cache-type-k q8_0 --cache-type-v q8_0 --prompt-sha256 d5b14aeedeb3d55b16b25dda788be3e5003ebb9d423ad6d6f43e54019c3bdc01 --prompt-tokens 32004 --n-predict 128",
+            "offload_evidence": true,
+            "provenance": {
+              "cli": "bounded-live-capture",
+              "gpu": "/sys/class/drm",
+              "host": "/proc"
+            },
+            "vram_capacity_mib": 16368,
+            "vram_card": "card1",
+            "vram_pci_id": "1002:73BF"
+          },
+          "metrics": {
+            "exit_code": 0,
+            "generation_eval_ms": 4414.62,
+            "generation_tokens": 10,
+            "generation_tokens_per_second": 2.04,
+            "min_mem_available_mib": 54423,
+            "peak_vram_mib": 10177,
+            "prompt_eval_ms": 393077.47,
+            "prompt_tokens": 32025,
+            "prompt_tokens_per_second": 81.47,
+            "swap_in_pages": 0,
+            "timed_out": false,
+            "vram_capacity_mib": 16368
+          },
+          "prompt_tokens": 32025,
+          "quality": {
+            "context_confirmed": true,
+            "device_confirmed": true,
+            "exact_completion": true,
+            "offload_confirmed": true,
+            "passed": true,
+            "timing_confirmed": true
+          }
+        }
+      ],
+      "config_id": "3bc4787e59d7511554cf0698f20669b3aa7b5efa07f19e9cf790bf401eee4724",
+      "evidence": {
+        "attempt_count": 3,
+        "attempt_ids": [
+          "86535f788b85182129f52059c677a511e5ad44f9f7c4c156f703b0547b8130da.attempt-01",
+          "86535f788b85182129f52059c677a511e5ad44f9f7c4c156f703b0547b8130da.attempt-02",
+          "86535f788b85182129f52059c677a511e5ad44f9f7c4c156f703b0547b8130da.attempt-03"
+        ],
+        "attempts_digest": "93d4bf5597ecaf4c6dc66c7d3d087ebd4912279f28e6b8962e7f03e4024a9456",
+        "context_observed": true,
+        "device_observed": "0.00.012.322 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 6900 XT (RADV NAVI21) (16368 MiB, 15406 MiB free)",
+        "long_context_canary": true,
+        "measurement_source": "live",
+        "observed_command": "llama-cli --ctx-size 32768 --device Vulkan0 --gpu-layers 20 --flash-attn on --batch-size 256 --ubatch-size 128 --cache-type-k q8_0 --cache-type-v q8_0 --prompt-sha256 d5b14aeedeb3d55b16b25dda788be3e5003ebb9d423ad6d6f43e54019c3bdc01 --prompt-tokens 32004 --n-predict 128",
+        "offload_evidence": true,
+        "provenance": {
+          "cli": "bounded-live-capture",
+          "gpu": "/sys/class/drm",
+          "host": "/proc"
+        },
+        "row_metrics": {
+          "exit_code": 0,
+          "generation_eval_ms": 3825.83,
+          "generation_tokens": 10,
+          "generation_tokens_per_second": 2.38,
+          "min_mem_available_mib": 54423,
+          "peak_vram_mib": 10177,
+          "prompt_eval_ms": 131865.97666666665,
+          "prompt_tokens": 32025,
+          "prompt_tokens_per_second": 40.38333333333333,
+          "swap_in_pages": 0,
+          "swap_out_pages": null,
+          "timed_out": false,
+          "vram_capacity_mib": 16368
+        },
+        "row_quality": {
+          "context_confirmed": true,
+          "device_confirmed": true,
+          "exact_completion": true,
+          "passed": true,
+          "stability_confirmed": true,
+          "timing_confirmed": true
+        },
+        "row_status": "pass",
+        "vram_capacity_mib": 16368,
+        "vram_card": "card1",
+        "vram_pci_id": "1002:73BF"
+      },
+      "evidence_id": "42684fbf480e380a3c7285a3ebdb952c5e16805b1b58c8e4f79822ef7389a09a",
+      "lifecycle": {
+        "bounded": true,
+        "finished": true,
+        "started": true
+      },
+      "metrics": {
+        "exit_code": 0,
+        "generation_eval_ms": 3825.83,
+        "generation_tokens": 10,
+        "generation_tokens_per_second": 2.38,
+        "min_mem_available_mib": 54423,
+        "peak_vram_mib": 10177,
+        "prompt_eval_ms": 131865.97666666665,
+        "prompt_tokens": 32025,
+        "prompt_tokens_per_second": 40.38333333333333,
+        "swap_in_pages": 0,
+        "swap_out_pages": null,
+        "timed_out": false,
+        "vram_capacity_mib": 16368
+      },
+      "parameters": {
+        "batch": 256,
+        "flash_attention": "on",
+        "gpu_layers": 20,
+        "kv_cache": "q8_0",
+        "quantization": "Q8_0",
+        "ubatch": 128
+      },
+      "quality": {
+        "context_confirmed": true,
+        "device_confirmed": true,
+        "exact_completion": true,
+        "passed": true,
+        "stability_confirmed": true,
+        "timing_confirmed": true
+      },
+      "schema_version": "hybrid-vulkan-tuning-v1",
+      "status": "pass",
+      "tuple_id": "86535f788b85182129f52059c677a511e5ad44f9f7c4c156f703b0547b8130da"
+    },
+    {
+      "attempts": [
+        {
+          "attempt_id": "d30835598524d058ab12c5fd6c0fa371c0a1d66f4ff6e21106329b99c78c567e.attempt-01",
+          "evidence": {
+            "context_observed": false,
+            "device_observed": "0.00.013.438 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 6900 XT (RADV NAVI21) (16368 MiB, 15406 MiB free)",
+            "failure_reason": "quantized V cache requires flash_attn to be enabled",
+            "measurement_source": "live",
+            "observed_command": "llama-cli --ctx-size 32768 --device Vulkan0 --gpu-layers 20 --flash-attn off --batch-size 256 --ubatch-size 128 --cache-type-k q8_0 --cache-type-v q8_0 --prompt-sha256 ac7d192329eadcd3e0a67996567e3f0608a1f627a44fabde257b5472c1c5c9df --prompt-tokens 4 --n-predict 128",
+            "offload_evidence": true,
+            "provenance": {
+              "cli": "bounded-live-capture",
+              "gpu": "/sys/class/drm",
+              "host": "/proc"
+            },
+            "vram_capacity_mib": 16368,
+            "vram_card": "card1",
+            "vram_pci_id": "1002:73BF"
+          },
+          "metrics": {
+            "exit_code": 1,
+            "generation_eval_ms": null,
+            "generation_tokens": null,
+            "generation_tokens_per_second": null,
+            "min_mem_available_mib": 55692,
+            "peak_vram_mib": 9575,
+            "prompt_eval_ms": null,
+            "prompt_tokens": null,
+            "prompt_tokens_per_second": null,
+            "swap_in_pages": 0,
+            "timed_out": false,
+            "vram_capacity_mib": 16368
+          },
+          "prompt_tokens": null,
+          "quality": {
+            "context_confirmed": false,
+            "device_confirmed": true,
+            "exact_completion": false,
+            "offload_confirmed": true,
+            "passed": false,
+            "timing_confirmed": false
+          }
+        }
+      ],
+      "config_id": "3bc4787e59d7511554cf0698f20669b3aa7b5efa07f19e9cf790bf401eee4724",
+      "evidence": {
+        "attempts_digest": "97cfeff7896921da4135d73b1b2ba95045fb4bc5ee41debef0766955222ae7c0",
+        "context_observed": false,
+        "device_observed": "0.00.013.438 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 6900 XT (RADV NAVI21) (16368 MiB, 15406 MiB free)",
+        "failure_reason": "quantized V cache requires flash_attn to be enabled",
+        "measurement_source": "live",
+        "observed_command": "llama-cli --ctx-size 32768 --device Vulkan0 --gpu-layers 20 --flash-attn off --batch-size 256 --ubatch-size 128 --cache-type-k q8_0 --cache-type-v q8_0 --prompt-sha256 ac7d192329eadcd3e0a67996567e3f0608a1f627a44fabde257b5472c1c5c9df --prompt-tokens 4 --n-predict 128",
+        "offload_evidence": true,
+        "provenance": {
+          "cli": "bounded-live-capture",
+          "gpu": "/sys/class/drm",
+          "host": "/proc"
+        },
+        "row_metrics": {
+          "exit_code": 1,
+          "timed_out": false
+        },
+        "row_quality": {
+          "context_confirmed": false,
+          "device_confirmed": true,
+          "exact_completion": false,
+          "offload_confirmed": true,
+          "passed": false,
+          "timing_confirmed": false
+        },
+        "row_status": "incompatible",
+        "vram_capacity_mib": 16368,
+        "vram_card": "card1",
+        "vram_pci_id": "1002:73BF"
+      },
+      "evidence_id": "abd363f8859461be9cbb19de128084069e01a51d671b9ebbe098affbc392ca3f",
+      "lifecycle": {
+        "bounded": true,
+        "finished": true,
+        "started": true
+      },
+      "metrics": {
+        "exit_code": 1,
+        "timed_out": false
+      },
+      "parameters": {
+        "batch": 256,
+        "flash_attention": "off",
+        "gpu_layers": 20,
+        "kv_cache": "q8_0",
+        "quantization": "Q8_0",
+        "ubatch": 128
+      },
+      "quality": {
+        "context_confirmed": false,
+        "device_confirmed": true,
+        "exact_completion": false,
+        "offload_confirmed": true,
+        "passed": false,
+        "timing_confirmed": false
+      },
+      "schema_version": "hybrid-vulkan-tuning-v1",
+      "status": "incompatible",
+      "tuple_id": "d30835598524d058ab12c5fd6c0fa371c0a1d66f4ff6e21106329b99c78c567e"
+    }
+  ],
+  "safety": {
+    "maximum_swap_in_pages": 0,
+    "minimum_mem_available_mib": 8192,
+    "minimum_vram_free_mib": 1024
+  },
+  "schema_version": "hybrid-vulkan-tuning-v1",
+  "selection": {
+    "candidate_count": 2,
+    "deterministic": true,
+    "policy": "pass, generation-tps desc, prompt-tps desc, prompt-eval-ms asc, generation-eval-ms asc, peak-vram asc, tuple-id asc"
+  },
+  "stable_candidate": {
+    "metrics": {
+      "exit_code": 0,
+      "generation_eval_ms": 3825.83,
+      "generation_tokens": 10,
+      "generation_tokens_per_second": 2.38,
+      "min_mem_available_mib": 54423,
+      "peak_vram_mib": 10177,
+      "prompt_eval_ms": 131865.97666666665,
+      "prompt_tokens": 32025,
+      "prompt_tokens_per_second": 40.38333333333333,
+      "swap_in_pages": 0,
+      "swap_out_pages": null,
+      "timed_out": false,
+      "vram_capacity_mib": 16368
+    },
+    "parameters": {
+      "batch": 256,
+      "flash_attention": "on",
+      "gpu_layers": 20,
+      "kv_cache": "q8_0",
+      "quantization": "Q8_0",
+      "ubatch": 128
+    }
+  }
+}
