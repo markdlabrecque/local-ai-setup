@@ -3,11 +3,9 @@
 The service is deliberately tested through a bounded fake ``systemctl``.  No
 real user manager, router, model, or runtime binary is started by this suite.
 """
-import configparser
 import json
 import os
 import re
-import shlex
 import stat
 import subprocess
 import tempfile
@@ -66,7 +64,8 @@ class Issue8SystemdService(unittest.TestCase):
         self.assertTrue(UNIT_SOURCE.is_file(), "missing tracked user service unit")
         text = UNIT_SOURCE.read_text()
         self.assertIsNone(BAD_HOME_PATH.search(text), "unit embeds a machine home path")
-        self.assertRegex(text, r"(?m)^EnvironmentFile=-?%[hE]/")
+        self.assertRegex(text, r"(?m)^EnvironmentFile=-%E/.+")
+        self.assertRegex(text, r"(?m)^ExecStart=.*%h.*run-router\.sh")
         self.assertRegex(text, r"(?m)^ExecStart=.*(?:run-router\.sh|LOCAL_AI_RUN_ROUTER)")
         self.assertRegex(text, r"(?m)^ExecStart=.*--foreground(?:\s|$)")
 
@@ -109,7 +108,7 @@ class Issue8SystemdService(unittest.TestCase):
 
     def fake_systemctl(self, root):
         bindir = root / "bin"
-        bindir.mkdir()
+        bindir.mkdir(exist_ok=True)
         log = root / "systemctl.jsonl"
         fake = bindir / "systemctl"
         fake.write_text(
@@ -129,9 +128,9 @@ class Issue8SystemdService(unittest.TestCase):
         home = root / "home with spaces;literal"
         xdg = root / "xdg config;literal"
         data = root / "data with spaces"
-        home.mkdir()
-        xdg.mkdir()
-        data.mkdir()
+        home.mkdir(exist_ok=True)
+        xdg.mkdir(exist_ok=True)
+        data.mkdir(exist_ok=True)
         env.update({"HOME": str(home), "XDG_CONFIG_HOME": str(xdg),
                     "XDG_DATA_HOME": str(data),
                     "PATH": f"{bindir}:{env['PATH']}"})
@@ -237,8 +236,10 @@ class Issue8SystemdService(unittest.TestCase):
     def test_operator_documentation_covers_complete_lifecycle(self):
         self.assertTrue(DOC.is_file(), "missing Issue #8 operator documentation")
         text = DOC.read_text()
+        self.assertRegex(text, r"install-router-service\.sh", "documentation omits install")
         for command in ("daemon-reload", "enable", "start", "stop", "restart", "status"):
-            self.assertIn(command, text, f"documentation omits {command}")
+            self.assertRegex(text, rf"systemctl\s+--user\s+{command}\b",
+                             f"documentation omits systemctl --user {command}")
         self.assertRegex(text, r"journalctl\s+--user.*(?:-u|--unit)|(?:-u|--unit).*journalctl\s+--user")
         self.assertIn("uninstall", text.lower())
 
