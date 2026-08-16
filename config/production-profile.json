@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "selected_profile": "quality-first",
+  "profiles": {
+    "quality-first": {
+      "status": "production",
+      "model": {
+        "id": "Qwen3.5-27B-Q8_0",
+        "quantization": "Q8_0",
+        "sha256": "6b0a101b0a86697fe11eabcc1a7db72699a9f3d4b18b6a1ac75ea3fb2c26c450"
+      },
+      "runtime": {"ref": "b10446", "commit": "adb55e5"},
+      "router": {
+        "context": 32768,
+        "device": "Vulkan0",
+        "pci_id": "1002:73BF",
+        "gpu_layers": 20,
+        "flash_attention": "on",
+        "batch": 256,
+        "ubatch": 128,
+        "cache_k": "q8_0",
+        "cache_v": "q8_0",
+        "autoload": false
+      },
+      "pi": {
+        "provider": "local-qwen",
+        "model": "Qwen3.5-27B-Q8_0",
+        "context_tokens": 32768,
+        "max_output_tokens": 4096,
+        "thinking_format": "qwen-chat-template"
+      },
+      "observed": {
+        "cold": {"load_ms": 8782.608141, "ttft_ms": 12364.377307, "prompt_tokens_per_second": 18.858333, "generation_tokens_per_second": 2.951594},
+        "warm": {"load_ms": 3427.746428, "ttft_ms": 7203.762047, "prompt_tokens_per_second": 18.892567, "generation_tokens_per_second": 2.922641},
+        "peak_vram_mib": 10173,
+        "minimum_available_ram_mib": 54346,
+        "swap_in_pages": 0,
+        "direct_baseline_resident_ram_mib_approx": 28160
+      }
+    }
+  },
+  "alternatives": {
+    "interactive": {
+      "status": "not-selected",
+      "reason": "No separately validated configuration materially outperformed the selected 20-layer Q8_0 profile; the 16-layer Q8_0 tuning row was slower."
+    },
+    "q6_k_fallback": {
+      "status": "not-selected",
+      "reason": "Q8_0 passed 32K quality, stability, Pi tool use, and memory-safety criteria. Q6_K has not undergone the required comparative quality evaluation.",
+      "activation_requirements": [
+        "Q8_0 violates the tracked RAM, VRAM, swap, or stability threshold",
+        "Q6_K artifact checksum is verified",
+        "Issue #11 evaluation and Issue #12 benchmark are repeated for Q6_K",
+        "the quality comparison and revised profile selection are committed"
+      ]
+    }
+  },
+  "evidence": {
+    "tuning": {"path": "docs/issue-6-hybrid-vulkan-tuning-result.json", "sha256": "aa277d5fda62af12568b541bf40c43753a71363874f1624c545e43daf67c8475"},
+    "benchmark": {"path": "docs/issue-12-benchmark-result.json", "sha256": "dba333bdc1e5ba3cc32e5eefd0dfdd2dc2f72ad306def6b853183f99b06ad0f6"},
+    "pi": {"path": "docs/issue-10-pi-result.json", "sha256": "c68c913147081a6ad09cbb848096b47aee105770977b32f1dd648a13ce6627d1"}
+  }
+}

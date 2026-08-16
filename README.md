@@ -95,6 +95,12 @@ bounded sanitized artifacts, and the report contract in
 [`schemas/evaluation-report.schema.json`](schemas/evaluation-report.schema.json).
 See [`docs/issue-11-evaluation.md`](docs/issue-11-evaluation.md).
 
+## Issue #13 production profile
+
+The selected profile is Q8_0 at 32K context with 20 Vulkan layers; no
+unvalidated faster or Q6_K profile is enabled. See
+[`docs/issue-13-production-profile.md`](docs/issue-13-production-profile.md).
+
 ## Issue #10 Pi integration
 
 Pi uses the native llama.cpp provider for `/login llama.cpp` and `/llama`, plus
