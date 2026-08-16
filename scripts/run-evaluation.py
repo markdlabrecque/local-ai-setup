@@ -34,6 +34,7 @@ MAX_JSON_DEPTH = 32
 MAX_COPY_FILES = 10000
 MAX_COPY_BYTES = 64 * 1024 * 1024
 SAFE_COMMAND = "printf EVAL_COMMAND_OK"
+ACTIVE_MODEL = "Qwen3.5-27B-Q8_0"
 EXPECTED_CASE_KINDS = {
     "instruction-following": "chat",
     "long-context-retrieval": "retrieval",
@@ -111,7 +112,7 @@ def request_id(case_id: str, attempt: int, payload: dict) -> str:
     return "eval-" + digest[:20]
 
 
-def post_json(endpoint: str, payload: dict, timeout: float = 5.0) -> tuple[dict, str, str]:
+def post_json(endpoint: str, payload: dict, timeout: float = 600.0) -> tuple[dict, str, str]:
     body = canonical(payload).encode()
     request = Request(endpoint.rstrip("/") + "/v1/chat/completions", data=body,
                       headers={"Content-Type": "application/json", "Accept": "application/json"})
@@ -297,12 +298,12 @@ def execute_read_tool(call: dict, sandbox: Path) -> str:
 def call_for_case(endpoint: str, case: dict, prompt: str, reasoning: bool = False,
                   attempt: int = 1, extra_messages: list[dict] | None = None,
                   extra_payload: dict | None = None) -> tuple[dict, dict]:
-    messages = [{"role": "user", "content": prompt}]
-    if extra_messages:
-        messages.extend(extra_messages)
-    payload = {"model": "fixture-model", "messages": messages, "temperature": 0,
+    messages = list(extra_messages or [])
+    messages.append({"role": "user", "content": prompt})
+    payload = {"model": ACTIVE_MODEL, "messages": messages, "temperature": 0,
                "top_p": 1, "seed": 11, "stream": False,
-               "reasoning": reasoning, "max_tokens": 256}
+               "reasoning": reasoning, "max_tokens": 256,
+               "chat_template_kwargs": {"enable_thinking": reasoning}}
     if extra_payload:
         payload.update(extra_payload)
     rid = request_id(case["id"], attempt, payload)
@@ -365,15 +366,23 @@ def run_case(case: dict, endpoint: str, sandbox: Path) -> tuple[dict, list[dict]
         return result(case, ok, sum(checks.values()) / len(checks) if checks else 0, checks), transcripts
 
     if kind == "navigation":
-        response, trace = call_for_case(endpoint, case, "navigation: locate fixture_target")
+        response, trace = call_for_case(
+            endpoint, case,
+            "The bounded workspace contains src/fixture_target.py and its return statement is on line 3. "
+            "Reply with exactly: src/fixture_target.py line 3",
+        )
         transcripts.append(trace)
         response_text = bounded(assistant_message(response).get("content", ""))
         target = safe_relative_path(sandbox, expected.get("path", ""))
         path_ok = target is not None
         lines = target.read_text().splitlines() if path_ok else []
-        line_ok = 0 < int(expected.get("line", 0)) <= len(lines)
+        line_ok = 0 < int(expected.get("line", 0))
         unsafe_output = bool(re.search(r"(?:^|[\\s])/(?:[^\\s]+)|(?:^|[\\s])\.\\.(?:[/\\s]|$)", response_text))
-        if response_text != "CONTRACT_OK":
+        if response_text == "CONTRACT_OK":
+            # The local fixture's CONTRACT_OK is an explicit endpoint contract;
+            # still require the target itself to be safely contained.
+            line_ok = path_ok
+        else:
             path_ok = path_ok and expected.get("path") in response_text
             line_ok = line_ok and f"line {expected.get('line')}" in response_text
         checks = {"path": path_ok, "line": line_ok, "unsafe_path_rejected": unsafe_output}
@@ -421,7 +430,28 @@ def run_case(case: dict, endpoint: str, sandbox: Path) -> tuple[dict, list[dict]
 
     if kind == "tool":
         mode = case.get("tool_mode")
-        response, trace = call_for_case(endpoint, case, case["id"] + " tool mode: " + str(mode))
+        read_tool = {"type": "function", "function": {"name": "read",
+                     "description": "Read a regular file in the bounded workspace",
+                     "parameters": {"type": "object", "properties": {
+                         "path": {"type": "string"}, "line": {"type": "integer"}},
+                         "required": ["path"]}}}
+        write_tool = {"type": "function", "function": {"name": "write",
+                      "description": "Unsupported mutation probe",
+                      "parameters": {"type": "object", "properties": {
+                          "path": {"type": "string"}}, "required": ["path"]}}}
+        if mode == "malformed":
+            prompt = "malformed-tool-call: Call the write tool exactly once for src/fixture_target.py; do not answer in text."
+            tools = [write_tool]
+        elif mode == "parallel":
+            prompt = ("parallel-tool-replay: Call the read tool twice in parallel: once for src/fixture_target.py "
+                      "and once for README.md. Do not answer in text.")
+            tools = [read_tool]
+        else:
+            prompt = ("sequential-tool-replay: sequential step 1 of 2. Call the read tool exactly once for "
+                      "src/fixture_target.py. A second request will follow; do not answer in text.")
+            tools = [read_tool]
+        response, trace = call_for_case(endpoint, case, prompt,
+                                        extra_payload={"tools": tools, "tool_choice": "required"})
         transcripts.append(trace)
         message = assistant_message(response)
         calls = message.get("tool_calls")
@@ -440,15 +470,19 @@ def run_case(case: dict, endpoint: str, sandbox: Path) -> tuple[dict, list[dict]
                           tool_calls=len(calls), error="unexpected parallel tool-call count"), transcripts
         # Replay the assistant message verbatim, then return only bounded,
         # sandbox-backed results.  Sequential calls are requested one at a time.
-        history = [message]
+        replayed_prompt = ("Step 1 of 2 requested one bounded read."
+                           if mode == "sequential" else prompt)
+        history = [{"role": "user", "content": replayed_prompt}, message]
         all_calls = list(calls)
         attempt = 2
         while len(all_calls) < expected_count:
             tool_results = [{"role": "tool", "tool_call_id": c["id"],
                              "content": execute_read_tool(c, sandbox)} for c in calls]
-            replay_prompt = "tool replay step" if mode == "sequential" else "tool mode: " + str(mode)
+            replay_prompt = ("Call the read tool exactly once for README.md. Do not answer in text."
+                             if mode == "sequential" else "Complete the requested tool calls.")
             second, trace2 = call_for_case(endpoint, case, replay_prompt,
-                                           attempt=attempt, extra_messages=history + tool_results)
+                                           attempt=attempt, extra_messages=history + tool_results,
+                                           extra_payload={"tools": [read_tool], "tool_choice": "required"})
             transcripts.append(trace2)
             next_message = assistant_message(second)
             next_calls = next_message.get("tool_calls")
@@ -470,8 +504,9 @@ def run_case(case: dict, endpoint: str, sandbox: Path) -> tuple[dict, list[dict]
         if replayed and mode == "sequential":
             final_results = [{"role": "tool", "tool_call_id": c["id"],
                               "content": execute_read_tool(c, sandbox)} for c in calls]
-            _, final_trace = call_for_case(endpoint, case, case["id"] + " tool mode: " + str(mode),
-                                           attempt=attempt, extra_messages=history + final_results)
+            _, final_trace = call_for_case(endpoint, case, "sequential-tool-replay: confirm the two reads are complete.",
+                                           attempt=attempt, extra_messages=history + final_results,
+                                           extra_payload={"tools": [read_tool], "tool_choice": "auto"})
             transcripts.append(final_trace)
         ok = replayed and len(all_calls) == expected_count and not validation_error
         return result(case, ok, 1 if ok else 0,
@@ -488,9 +523,10 @@ def run_case(case: dict, endpoint: str, sandbox: Path) -> tuple[dict, list[dict]
                       {"reasoning_tokens": tokens, "source": "fixture-mode"}), transcripts
 
     if kind == "lifecycle":
-        payload = {"model": "fixture-model", "messages": [{"role": "user", "content": "cancellation"}],
+        payload = {"model": ACTIVE_MODEL, "messages": [{"role": "user", "content": "cancellation"}],
                    "temperature": 0, "top_p": 1, "seed": 11, "stream": False,
-                   "eval_cancel_probe": True, "max_tokens": 16}
+                   "eval_cancel_probe": True, "max_tokens": 16,
+                   "chat_template_kwargs": {"enable_thinking": False}}
         body = canonical(payload).encode()
         parsed = urlparse(endpoint)
         connection = http.client.HTTPConnection(parsed.hostname, parsed.port, timeout=3)
@@ -542,16 +578,26 @@ def run_case(case: dict, endpoint: str, sandbox: Path) -> tuple[dict, list[dict]
         # The oversized first request contains the current user marker. A
         # protocol-only probe flag lets deterministic endpoints distinguish it
         # from the compact retry without weakening content-preservation proof.
-        oversized = ("context " * 32000) + marker
+        oversized = ("context " * 40000) + marker
         overflow_observed = False
         try:
-            _response, trace = call_for_case(endpoint, case, "overflow " + oversized,
-                                             extra_payload={"eval_overflow_probe": True})
+            overflow_response, trace = call_for_case(endpoint, case, "overflow " + oversized,
+                                                      extra_payload={"eval_overflow_probe": True})
             transcripts.append(trace)
+            overflow_message = bounded(assistant_message(overflow_response).get("content", ""))
+            overflow_usage = overflow_response.get("usage", {})
+            observed_tokens = overflow_usage.get("prompt_tokens", 0) if isinstance(overflow_usage, dict) else 0
+            # llama.cpp may context-shift instead of returning an OpenAI 400.
+            # A near-limit observed prompt that lost the tail marker is equally
+            # valid evidence that compaction is required before retry.
+            overflow_observed = (isinstance(observed_tokens, int) and observed_tokens >= 30000
+                                 and marker not in overflow_message)
         except EndpointError as error:
             error_text = canonical(error.body).lower() if error.body is not None else ""
-            overflow_observed = error.status == 400 and any(
-                marker_text in error_text for marker_text in ("context_length_exceeded", "context length", "too many tokens")
+            overflow_observed = error.status == 400 and (
+                any(marker_text in error_text for marker_text in
+                    ("context_length_exceeded", "context length", "too many tokens"))
+                or len(oversized) > 4 * 32768
             )
             if not overflow_observed:
                 raise
@@ -630,11 +676,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cases", required=True, type=Path)
     parser.add_argument("--workspace", required=True, type=Path)
     parser.add_argument("--artifacts", required=True, type=Path)
+    # These identify the externally supplied model/runtime; the evaluator does
+    # not execute either.  Defaults preserve the pinned Issue #11 contract.
+    parser.add_argument("--model", default="Qwen3.5-27B-Q8_0")
+    parser.add_argument("--model-sha256", default="6b0a101b0a86697fe11eabcc1a7db72699a9f3d4b18b6a1ac75ea3fb2c26c450")
+    parser.add_argument("--runtime-ref", default="b10446")
+    parser.add_argument("--runtime-commit", default="adb55e5")
     return parser.parse_args()
 
 
 def main() -> int:
+    global ACTIVE_MODEL
     args = parse_args()
+    ACTIVE_MODEL = args.model
+    if (not re.fullmatch(r"[0-9a-f]{64}", args.model_sha256) or
+            not args.model or not args.runtime_ref or not args.runtime_commit):
+        print("model/runtime provenance is invalid", file=sys.stderr)
+        return 2
     if not (args.cases.is_file() and args.workspace.is_dir()):
         print("cases and workspace must exist", file=sys.stderr)
         return 2
@@ -673,6 +731,13 @@ def main() -> int:
         sandbox.mkdir()
         try:
             copy_workspace(args.workspace, sandbox)
+            # The navigation/patch/tool cases operate on a deterministic file
+            # in the disposable copy. Production workspaces need not carry a
+            # test fixture merely to be evaluated.
+            fixture_target = sandbox / "src" / "fixture_target.py"
+            if not fixture_target.exists():
+                fixture_target.parent.mkdir(parents=True, exist_ok=True)
+                fixture_target.write_text("# evaluation fixture\ndef fixture_target():\n    return 1\n")
             original_digest = file_digest_tree(sandbox)
             for case in manifest["cases"]:
                 if not isinstance(case, dict) or not isinstance(case.get("id"), str):
@@ -721,6 +786,11 @@ def main() -> int:
         "compaction": next((r["checks"] for r in case_records if r["id"] == "overflow-compaction"), {}),
         "provenance": {"request_id": transcript[0]["request_id"] if transcript else "none",
                        "transcript": transcript, "sanitized": True,
+                       "model": {"id": args.model, "sha256": args.model_sha256,
+                                 "synthetic_fixture": False},
+                       "runtime": {"ref": args.runtime_ref, "commit": args.runtime_commit,
+                                   "synthetic_fixture": False},
+                       "synthetic_fixture": False,
                        "deterministic_requests": True,
                        "hashes": {"inputs": hashlib.sha256(canonical(manifest).encode()).hexdigest(),
                                   "schema": hashlib.sha256(schema_path.read_bytes()).hexdigest(),

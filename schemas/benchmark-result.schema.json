@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/markdlabrecque/local-ai-setup/schemas/benchmark-result.schema.json",
+  "title": "Issue 12 reproducible benchmark result",
+  "type": "object",
+  "required": ["schema_version", "benchmark", "inputs", "runs", "summary", "safety", "provenance"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "benchmark-v1"},
+    "benchmark": {"type": "object", "required": ["name", "version"], "additionalProperties": false,
+      "properties": {"name": {"const": "issue-12-benchmark"}, "version": {"const": 1}}},
+    "inputs": {"type": "object", "required": ["model", "runtime", "prompt", "output", "context_tokens", "lifecycle", "candidate"],
+      "additionalProperties": false, "properties": {
+        "model": {"type": "object", "required": ["id", "quantization", "sha256"], "additionalProperties": false,
+          "properties": {"id": {"const": "Qwen3.5-27B-Q8_0"}, "quantization": {"const": "Q8_0"}, "sha256": {"pattern": "^[0-9a-f]{64}$"}}},
+        "runtime": {"type": "object", "required": ["ref", "commit", "source", "synthetic_fixture"], "additionalProperties": false,
+          "properties": {"ref": {"const": "b10446"}, "commit": {"const": "adb55e5"}, "source": {"const": "observed"}, "synthetic_fixture": {"const": false}}},
+        "prompt": {"type": "object", "required": ["token_count", "observed_token_count", "tokenizer"], "properties": {
+          "token_count": {"const": 23}, "observed_token_count": {"const": 23},
+          "tokenizer": {"type": "object", "required": ["pinned", "preflight"], "properties": {"pinned": {"const": true}, "preflight": {"const": true}}}}},
+        "output": {"type": "object", "required": ["token_count"], "properties": {"token_count": {"const": 8}}},
+        "context_tokens": {"const": 32768},
+        "lifecycle": {"type": "object", "required": ["modes", "warmup", "cold", "warm"], "properties": {
+          "modes": {"const": ["cold", "warm"]},
+          "warmup": {"const": false},
+          "cold": {"type": "object", "required": ["cache_miss", "new_process", "warmup", "checksum_before_preparation", "cache_preparation", "verifiable_or_deferred"], "properties": {
+            "checksum_before_preparation": {"const": true}, "cache_preparation": {"enum": ["model-file-fadvise", "page-cache-eviction", "deferred", "unsupported"]}, "verifiable_or_deferred": {"const": true}}},
+          "warm": {"type": "object", "required": ["cache_hit", "new_process", "warmup", "observed_after", "follows_observed_first_run"], "properties": {
+            "observed_after": {"const": "cold"}, "follows_observed_first_run": {"const": true}}}}},
+        "candidate": {"type": "object", "required": ["status", "tuple_id", "parameters", "quality", "evidence", "evidence_id"]}
+      }},
+    "runs": {"type": "array", "minItems": 2, "maxItems": 2, "prefixItems": [{"allOf": [{"$ref": "#/$defs/run"}], "properties": {"mode": {"const": "cold"}}}, {"allOf": [{"$ref": "#/$defs/run"}], "properties": {"mode": {"const": "warm"}}}], "items": {"allOf": [{"$ref": "#/$defs/run"}], "required": ["mode", "cache", "status", "lifecycle", "metrics", "hardware", "settings", "quality"], "properties": {"mode": {"enum": ["cold", "warm"]}, "cache": {"enum": ["miss", "hit"]}, "status": {"enum": ["pass", "fail", "timeout"]}, "lifecycle": {"required": ["started", "bounded", "finished"]}, "metrics": {"required": ["load_time_ms", "ttft_ms", "prompt_eval_ms", "prompt_tokens", "prompt_tokens_per_second", "generation_tokens", "generation_eval_ms", "generation_tokens_per_second"]}, "hardware": {"required": ["selected_gpu", "ram", "vram", "swap", "sampling"], "properties": {"sampling": {"type": "object", "required": ["owner", "source", "continuous", "proc_root"], "properties": {"owner": {"const": "runner"}, "source": {"const": "drm"}, "continuous": {"const": true}, "proc_root": {"type": "string", "minLength": 1}}}, "ram": {"required": ["minimum_available_mib", "passed"]}, "vram": {"required": ["capacity_mib", "peak_mib", "passed"]}, "swap": {"required": ["in_pages", "passed"]}}}, "settings": {"required": ["model", "quantization", "build", "device", "context_tokens"]}, "quality": {"required": ["suite", "report_sha256", "passed"]}}}},
+    "summary": {"type": "object", "required": ["status", "passed_runs"], "properties": {
+      "status": {"enum": ["pass", "fail"]}, "passed_runs": {"type": "integer", "minimum": 0, "maximum": 2}}},
+    "safety": {"type": "object", "required": ["selected_gpu", "selected_pci_id", "swap_in_pages", "ram_passed", "vram_passed"], "properties": {
+      "selected_gpu": {"const": "Vulkan0"}, "selected_pci_id": {"const": "1002:73BF"}, "swap_in_pages": {"type": "integer", "minimum": 0}, "ram_passed": {"type": "boolean"}, "vram_passed": {"type": "boolean"}}},
+    "provenance": {"type": "object", "required": ["config_sha256", "tuning_result_sha256", "evaluator_report_sha256", "artifact_sha256", "sanitized"], "additionalProperties": false,
+      "properties": {"config_sha256": {"$ref": "#/$defs/hash"}, "tuning_result_sha256": {"$ref": "#/$defs/hash"}, "evaluator_report_sha256": {"$ref": "#/$defs/hash"}, "artifact_sha256": {"$ref": "#/$defs/hash"}, "sanitized": {"const": true}}}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "run": {"type": "object", "required": ["mode", "cache", "status", "lifecycle", "metrics", "hardware", "settings", "quality"], "additionalProperties": false,
+      "properties": {
+        "mode": {"enum": ["cold", "warm"]}, "cache": {"enum": ["miss", "hit"]}, "status": {"enum": ["pass", "fail", "timeout"]},
+        "lifecycle": {"type": "object", "required": ["started", "bounded", "finished", "warmup", "new_process", "cache_evidence"], "properties": {"started": {"const": true}, "bounded": {"const": true}, "finished": {"const": true}, "warmup": {"const": false}, "new_process": {"const": true}, "cache_evidence": {"type": "object", "required": ["checksum_before_preparation", "preparation", "honest_status"], "properties": {"checksum_before_preparation": {"const": true}, "preparation": {"type": "string", "minLength": 1}, "honest_status": {"enum": ["verified-miss", "verified-hit", "unsupported", "deferred"]}}}}},
+        "metrics": {"type": "object", "required": ["load_time_ms", "ttft_ms", "prompt_eval_ms", "prompt_tokens", "prompt_tokens_per_second", "generation_eval_ms", "generation_tokens", "generation_tokens_per_second"], "properties": {
+          "load_time_ms": {"type": "number", "minimum": 0}, "ttft_ms": {"type": "number", "minimum": 0}, "prompt_eval_ms": {"type": "number", "minimum": 0}, "prompt_tokens": {"const": 23}, "prompt_tokens_per_second": {"type": "number", "exclusiveMinimum": 0}, "generation_eval_ms": {"type": "number", "minimum": 0}, "generation_tokens": {"const": 8}, "generation_tokens_per_second": {"type": "number", "exclusiveMinimum": 0}}},
+        "hardware": {"type": "object", "required": ["selected_gpu", "pci_id", "samples", "ram", "vram", "swap", "sampling"], "properties": {
+          "selected_gpu": {"const": "Vulkan0"}, "pci_id": {"const": "1002:73BF"}, "samples": {"type": "array", "minItems": 2, "items": {"type": "object", "required": ["pci_id", "drm_device", "source", "vram_capacity_mib", "vram_used_mib", "ram_available_mib", "swap_in_pages"], "properties": {"pci_id": {"const": "1002:73BF"}, "source": {"const": "drm"}, "drm_device": {"type": "string", "minLength": 1}}}},
+          "sampling": {"type": "object", "required": ["owner", "source", "continuous", "proc_root"], "properties": {"owner": {"const": "runner"}, "source": {"const": "drm"}, "continuous": {"const": true}, "proc_root": {"type": "string", "minLength": 1}}},
+          "ram": {"type": "object", "required": ["minimum_available_mib", "passed"]}, "vram": {"type": "object", "required": ["capacity_mib", "peak_mib", "passed"]}, "swap": {"type": "object", "required": ["in_pages", "passed"]}}},
+        "settings": {"type": "object", "required": ["model", "quantization", "build", "device", "context_tokens", "parameters"]},
+        "quality": {"type": "object", "required": ["suite", "report_sha256", "passed"], "properties": {"suite": {"const": "issue-11-evaluation"}, "report_sha256": {"$ref": "#/$defs/hash"}, "passed": {"type": "boolean"}}}
+      }}
+  }
+}

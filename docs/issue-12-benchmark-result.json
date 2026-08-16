@@ -1,0 +1,885 @@
+{
+  "benchmark": {
+    "name": "issue-12-benchmark",
+    "version": 1
+  },
+  "inputs": {
+    "candidate": {
+      "config_id": "3bc4787e59d7511554cf0698f20669b3aa7b5efa07f19e9cf790bf401eee4724",
+      "evidence": {
+        "attempt_count": 3,
+        "attempt_ids": [
+          "86535f788b85182129f52059c677a511e5ad44f9f7c4c156f703b0547b8130da.attempt-01",
+          "86535f788b85182129f52059c677a511e5ad44f9f7c4c156f703b0547b8130da.attempt-02",
+          "86535f788b85182129f52059c677a511e5ad44f9f7c4c156f703b0547b8130da.attempt-03"
+        ],
+        "attempts_digest": "93d4bf5597ecaf4c6dc66c7d3d087ebd4912279f28e6b8962e7f03e4024a9456",
+        "measurement_source": "live",
+        "row_quality": {
+          "context_confirmed": true,
+          "device_confirmed": true,
+          "exact_completion": true,
+          "offload_confirmed": true,
+          "passed": true,
+          "stability_confirmed": true,
+          "timing_confirmed": true
+        },
+        "row_status": "pass",
+        "vram_card": "card1",
+        "vram_pci_id": "1002:73BF"
+      },
+      "evidence_id": "42684fbf480e380a3c7285a3ebdb952c5e16805b1b58c8e4f79822ef7389a09a",
+      "lifecycle": {
+        "bounded": true,
+        "finished": true,
+        "started": true
+      },
+      "metrics": {
+        "exit_code": 0,
+        "generation_eval_ms": 3825.83,
+        "generation_tokens": 10,
+        "generation_tokens_per_second": 2.38,
+        "min_mem_available_mib": 54423,
+        "peak_vram_mib": 10177,
+        "prompt_eval_ms": 131865.97666666665,
+        "prompt_tokens": 32025,
+        "prompt_tokens_per_second": 40.38333333333333,
+        "swap_in_pages": 0,
+        "swap_out_pages": null,
+        "timed_out": false,
+        "vram_capacity_mib": 16368
+      },
+      "parameters": {
+        "batch": 256,
+        "flash_attention": "on",
+        "gpu_layers": 20,
+        "kv_cache": "q8_0",
+        "quantization": "Q8_0",
+        "ubatch": 128
+      },
+      "quality": {
+        "context_confirmed": true,
+        "device_confirmed": true,
+        "exact_completion": true,
+        "offload_confirmed": true,
+        "passed": true,
+        "stability_confirmed": true,
+        "timing_confirmed": true
+      },
+      "schema_version": "hybrid-vulkan-tuning-v1",
+      "status": "pass",
+      "tuple_id": "86535f788b85182129f52059c677a511e5ad44f9f7c4c156f703b0547b8130da"
+    },
+    "context_tokens": 32768,
+    "lifecycle": {
+      "cold": {
+        "cache_miss": true,
+        "cache_preparation": "model-file-fadvise",
+        "checksum_before_preparation": true,
+        "new_process": true,
+        "verifiable_or_deferred": true,
+        "warmup": false
+      },
+      "modes": [
+        "cold",
+        "warm"
+      ],
+      "warm": {
+        "cache_hit": true,
+        "follows_observed_first_run": true,
+        "new_process": true,
+        "observed_after": "cold",
+        "warmup": false
+      },
+      "warmup": false
+    },
+    "model": {
+      "id": "Qwen3.5-27B-Q8_0",
+      "quantization": "Q8_0",
+      "sha256": "6b0a101b0a86697fe11eabcc1a7db72699a9f3d4b18b6a1ac75ea3fb2c26c450"
+    },
+    "output": {
+      "token_count": 8
+    },
+    "prompt": {
+      "observed_token_count": 23,
+      "token_count": 23,
+      "tokenizer": {
+        "build": {
+          "commit": "adb55e5",
+          "ref": "b10446"
+        },
+        "pinned": true,
+        "preflight": true,
+        "source": "observed-pinned-llama.cpp"
+      }
+    },
+    "runtime": {
+      "commit": "adb55e5",
+      "ref": "b10446",
+      "source": "observed",
+      "synthetic_fixture": false
+    }
+  },
+  "provenance": {
+    "artifact_sha256": "364535f1193df924477f21910d4b3f560350d460e233bd75e99f2c7fbf297e29",
+    "config_sha256": "ad52c56fec045c466a3dce9682f6f416ad030d72ab6d8e2889cc67aad34eb03d",
+    "evaluator_report_sha256": "05599ff3c82189af096382de36301739e2f224faa45644d43c52910168216b3d",
+    "sanitized": true,
+    "tuning_result_sha256": "aa277d5fda62af12568b541bf40c43753a71363874f1624c545e43daf67c8475"
+  },
+  "runs": [
+    {
+      "cache": "miss",
+      "hardware": {
+        "pci_id": "1002:73BF",
+        "ram": {
+          "minimum_available_mib": 54444,
+          "passed": true
+        },
+        "samples": [
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55561,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 994
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55396,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 995
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55597,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 995
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55580,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 995
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55554,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 995
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55562,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 995
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55544,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 995
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55556,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 995
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55565,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 995
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55553,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 995
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55551,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 995
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55551,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 995
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55539,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 995
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55524,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 995
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55504,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 9608
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55504,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 9608
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55501,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 9608
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55495,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 9608
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55490,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 9608
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54603,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10170
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54603,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10172
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54603,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10172
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54454,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54448,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54448,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54448,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54448,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54444,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54444,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54444,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54444,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55235,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 994
+          }
+        ],
+        "sampling": {
+          "continuous": true,
+          "owner": "runner",
+          "proc_root": "/proc",
+          "source": "drm"
+        },
+        "selected_gpu": "Vulkan0",
+        "swap": {
+          "in_pages": 0,
+          "passed": true
+        },
+        "vram": {
+          "capacity_mib": 16368,
+          "passed": true,
+          "peak_mib": 10173
+        }
+      },
+      "lifecycle": {
+        "bounded": true,
+        "cache_evidence": {
+          "checksum_before_preparation": true,
+          "honest_status": "verified-miss",
+          "mode": "cold",
+          "model_checksum": "6b0a101b0a86697fe11eabcc1a7db72699a9f3d4b18b6a1ac75ea3fb2c26c450",
+          "order": 0,
+          "preparation": "model-file-fadvise",
+          "warmup_disabled": true
+        },
+        "finished": true,
+        "new_process": true,
+        "started": true,
+        "warmup": false
+      },
+      "metrics": {
+        "generation_eval_ms": 2710.4,
+        "generation_tokens": 8,
+        "generation_tokens_per_second": 2.951594,
+        "load_time_ms": 8782.608141,
+        "prompt_eval_ms": 1219.62,
+        "prompt_tokens": 23,
+        "prompt_tokens_per_second": 18.858333,
+        "ttft_ms": 12364.377307
+      },
+      "mode": "cold",
+      "quality": {
+        "passed": true,
+        "report_sha256": "05599ff3c82189af096382de36301739e2f224faa45644d43c52910168216b3d",
+        "suite": "issue-11-evaluation"
+      },
+      "settings": {
+        "build": {
+          "commit": "adb55e5",
+          "ref": "b10446"
+        },
+        "context_tokens": 32768,
+        "device": {
+          "pci_id": "1002:73BF",
+          "selected_gpu": "Vulkan0"
+        },
+        "model": "Qwen3.5-27B-Q8_0",
+        "parameters": {
+          "batch": 256,
+          "flash_attention": "on",
+          "gpu_layers": 20,
+          "kv_cache": "q8_0",
+          "quantization": "Q8_0",
+          "ubatch": 128
+        },
+        "quantization": "Q8_0"
+      },
+      "status": "pass"
+    },
+    {
+      "cache": "hit",
+      "hardware": {
+        "pci_id": "1002:73BF",
+        "ram": {
+          "minimum_available_mib": 54346,
+          "passed": true
+        },
+        "samples": [
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55235,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 994
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55202,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 1038
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55191,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 995
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55191,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 995
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55191,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 9608
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55191,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 9608
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55199,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 9608
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55199,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 9608
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55198,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 9608
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55198,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 9608
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55201,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 9608
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55197,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 9608
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54486,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10170
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54486,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10170
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54486,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10172
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54486,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10172
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54486,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10172
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54352,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54347,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54347,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54347,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54347,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54349,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54346,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54346,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54346,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54346,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54353,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54350,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54350,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 54350,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 10173
+          },
+          {
+            "drm_device": "/dev/dri/card1",
+            "pci_id": "1002:73BF",
+            "ram_available_mib": 55295,
+            "source": "drm",
+            "swap_in_pages": 0,
+            "vram_capacity_mib": 16368,
+            "vram_used_mib": 994
+          }
+        ],
+        "sampling": {
+          "continuous": true,
+          "owner": "runner",
+          "proc_root": "/proc",
+          "source": "drm"
+        },
+        "selected_gpu": "Vulkan0",
+        "swap": {
+          "in_pages": 0,
+          "passed": true
+        },
+        "vram": {
+          "capacity_mib": 16368,
+          "passed": true,
+          "peak_mib": 10173
+        }
+      },
+      "lifecycle": {
+        "bounded": true,
+        "cache_evidence": {
+          "checksum_before_preparation": true,
+          "honest_status": "verified-hit",
+          "mode": "warm",
+          "model_checksum": "6b0a101b0a86697fe11eabcc1a7db72699a9f3d4b18b6a1ac75ea3fb2c26c450",
+          "order": 1,
+          "preparation": "after-cold-process-before-second-process",
+          "warmup_disabled": true
+        },
+        "finished": true,
+        "new_process": true,
+        "started": true,
+        "warmup": false
+      },
+      "metrics": {
+        "generation_eval_ms": 2737.25,
+        "generation_tokens": 8,
+        "generation_tokens_per_second": 2.922641,
+        "load_time_ms": 3427.746428,
+        "prompt_eval_ms": 1217.41,
+        "prompt_tokens": 23,
+        "prompt_tokens_per_second": 18.892567,
+        "ttft_ms": 7203.762047
+      },
+      "mode": "warm",
+      "quality": {
+        "passed": true,
+        "report_sha256": "05599ff3c82189af096382de36301739e2f224faa45644d43c52910168216b3d",
+        "suite": "issue-11-evaluation"
+      },
+      "settings": {
+        "build": {
+          "commit": "adb55e5",
+          "ref": "b10446"
+        },
+        "context_tokens": 32768,
+        "device": {
+          "pci_id": "1002:73BF",
+          "selected_gpu": "Vulkan0"
+        },
+        "model": "Qwen3.5-27B-Q8_0",
+        "parameters": {
+          "batch": 256,
+          "flash_attention": "on",
+          "gpu_layers": 20,
+          "kv_cache": "q8_0",
+          "quantization": "Q8_0",
+          "ubatch": 128
+        },
+        "quantization": "Q8_0"
+      },
+      "status": "pass"
+    }
+  ],
+  "safety": {
+    "ram_passed": true,
+    "selected_gpu": "Vulkan0",
+    "selected_pci_id": "1002:73BF",
+    "swap_in_pages": 0,
+    "vram_passed": true
+  },
+  "schema_version": "benchmark-v1",
+  "summary": {
+    "passed_runs": 2,
+    "status": "pass"
+  }
+}

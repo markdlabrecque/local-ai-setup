@@ -95,6 +95,17 @@ bounded sanitized artifacts, and the report contract in
 [`schemas/evaluation-report.schema.json`](schemas/evaluation-report.schema.json).
 See [`docs/issue-11-evaluation.md`](docs/issue-11-evaluation.md).
 
+## Issue #12 benchmark
+
+The fixed cold/warm benchmark consumes the Issue #6 stable candidate and the
+passing Issue #11 report. It records streaming TTFT separately from prompt
+evaluation, bounds process groups/captures, and supports tamper-checked
+`--resume`. Use the portable gate and safe live command in
+[`docs/issue-12-benchmark.md`](docs/issue-12-benchmark.md). The completed live
+measurements and machine-readable evidence are in
+[`docs/issue-12-benchmark-result.md`](docs/issue-12-benchmark-result.md) and
+[`docs/issue-12-benchmark-result.json`](docs/issue-12-benchmark-result.json).
+
 ## Security
 
 Do not store sudo passwords, API keys, or model-access tokens in this repository. Model files and local `.env` files are ignored by Git.
