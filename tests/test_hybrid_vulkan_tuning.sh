@@ -92,7 +92,7 @@ PY
 # Resume must not rerun completed tuples, and must reject a changed fixed identity.
 cp "$out" "$tmp/first.json"
 HYBRID_FAKE_ARG_LOG="$tmp/resume-args" "$HARNESS" --config "$tmp/config.json" --llama-cli "$tmp/fake-llama-cli" \
-  --output "$out" --resume --run-timeout 5 --measurements '{"vram_capacity_mib":16384,"peak_vram_mib":14000,"min_mem_available_mib":12000,"swap_in_pages":0}' \
+  --output "$tmp/first.json" --resume --run-timeout 5 --measurements '{"vram_capacity_mib":16384,"peak_vram_mib":14000,"min_mem_available_mib":12000,"swap_in_pages":0}' \
   || fail "resume of completed matrix failed"
 [[ ! -s "$tmp/resume-args" ]] || fail "resume reran completed parameter tuples"
 printf '\n' >>"$tmp/config.json"
