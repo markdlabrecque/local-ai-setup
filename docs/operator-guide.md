@@ -193,7 +193,18 @@ scripts/pi-integration-smoke.py --real --timeout 300 \
 
 ## 8. Health, smoke, benchmark, and endurance checks
 
-Use the least expensive check that answers the operational question:
+After completing the clean-machine path, run the single final readiness gate:
+
+```bash
+scripts/verify-deployment.py --real --timeout 1200 \
+  --output results/deployment-verification.json
+```
+
+It exits nonzero with a named remediation on failure. On success it leaves the
+service active and pinned Q8_0 loaded for Pi. See
+[`issue-16-deployment-verification.md`](issue-16-deployment-verification.md).
+
+Use the least expensive component check when the full gate is unnecessary:
 
 ```bash
 # Router only; no load

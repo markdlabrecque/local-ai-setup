@@ -1,0 +1,131 @@
+{
+  "checks": [
+    {
+      "detail": {
+        "context_tokens": 32768,
+        "profile": "quality-first"
+      },
+      "duration_ms": 14.819,
+      "name": "pinned-config",
+      "passed": true
+    },
+    {
+      "detail": {
+        "commit": "adb55e5",
+        "executables": {
+          "llama-bench": ".local/share/local-ai/runtime/llama.cpp-b10446/bin/llama-bench",
+          "llama-cli": ".local/share/local-ai/runtime/llama.cpp-b10446/bin/llama-cli",
+          "llama-server": ".local/share/local-ai/runtime/llama.cpp-b10446/bin/llama-server"
+        },
+        "ref": "b10446"
+      },
+      "duration_ms": 41.816,
+      "name": "pinned-binaries",
+      "passed": true
+    },
+    {
+      "detail": {
+        "adapter": "AMD Radeon RX 6900 XT",
+        "pci_id": "1002:73BF",
+        "vram_capacity_mib": 16368
+      },
+      "duration_ms": 14.417,
+      "name": "vulkan-gpu",
+      "passed": true
+    },
+    {
+      "detail": {
+        "id": "Qwen3.5-27B-Q8_0",
+        "manifest_id": "qwen3.5-27b-q8_0",
+        "sha256": "6b0a101b0a86697fe11eabcc1a7db72699a9f3d4b18b6a1ac75ea3fb2c26c450",
+        "size_bytes": 28595763104
+      },
+      "duration_ms": 12033.65,
+      "name": "model-identity",
+      "passed": true
+    },
+    {
+      "detail": {
+        "endpoint": "http://127.0.0.1:8080",
+        "initial_model_state": "unloaded",
+        "service": "local-ai-router.service",
+        "state": "active"
+      },
+      "duration_ms": 24343.474,
+      "name": "service-and-router",
+      "passed": true
+    },
+    {
+      "detail": {
+        "context_tokens": 32768,
+        "passed_checks": 11
+      },
+      "duration_ms": 491802.183,
+      "name": "router-api-smoke",
+      "passed": true
+    },
+    {
+      "detail": {
+        "model": "Qwen3.5-27B-Q8_0",
+        "state": "loaded"
+      },
+      "duration_ms": 28154.547,
+      "name": "production-model-load",
+      "passed": true
+    },
+    {
+      "detail": {
+        "parallel_tools": true,
+        "passed_checks": 5,
+        "sequential_tools": true
+      },
+      "duration_ms": 111159.719,
+      "name": "pi-tool-smoke",
+      "passed": true
+    },
+    {
+      "detail": {
+        "final_model_state": "loaded",
+        "minimum_available_ram_mib": 52895,
+        "oom_markers": [],
+        "peak_vram_mib": 10341,
+        "sample_count": 668,
+        "swap_in_pages_delta": 0,
+        "vram_capacity_mib": 16368
+      },
+      "duration_ms": 3.004,
+      "name": "final-health-and-resources",
+      "passed": true
+    }
+  ],
+  "context_tokens": 32768,
+  "duration_seconds": 667.568,
+  "endpoint": "http://127.0.0.1:8080",
+  "final_state": {
+    "model": "loaded",
+    "service": "active"
+  },
+  "model": {
+    "id": "Qwen3.5-27B-Q8_0",
+    "manifest_id": "qwen3.5-27b-q8_0",
+    "sha256": "6b0a101b0a86697fe11eabcc1a7db72699a9f3d4b18b6a1ac75ea3fb2c26c450",
+    "size_bytes": 28595763104
+  },
+  "resources": {
+    "final_model_state": "loaded",
+    "minimum_available_ram_mib": 52895,
+    "oom_markers": [],
+    "peak_vram_mib": 10341,
+    "sample_count": 668,
+    "swap_in_pages_delta": 0,
+    "vram_capacity_mib": 16368
+  },
+  "runtime": {
+    "commit": "adb55e5",
+    "ref": "b10446"
+  },
+  "sanitized": true,
+  "schema_version": 1,
+  "status": "pass",
+  "suite": "issue-16-deployment-verification"
+}
