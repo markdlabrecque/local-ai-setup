@@ -2,6 +2,7 @@
 """Deterministic, disposable OpenAI-compatible endpoint for evaluation tests."""
 import argparse
 import json
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
@@ -35,17 +36,33 @@ class Handler(BaseHTTPRequestHandler):
         request = json.loads(self.rfile.read(length) or b"{}")
         messages = request.get("messages", [])
         marker = json.dumps(messages, sort_keys=True)
+        # This opt-in delay gives the cancellation case a deterministic
+        # in-flight request while allowing /health to prove recovery.
+        if request.get("eval_cancel_probe"):
+            time.sleep(0.25)
+        has_tool_result = any(m.get("role") == "tool" for m in messages if isinstance(m, dict))
         if "malformed" in marker:
             message = {"role": "assistant", "tool_calls": [{"id": "bad", "type": "function"}]}
-        elif "parallel" in marker:
+        elif "parallel" in marker and not has_tool_result:
             message = {"role": "assistant", "tool_calls": [
                 {"id": "call-a", "type": "function", "function": {"name": "read", "arguments": "{}"}},
                 {"id": "call-b", "type": "function", "function": {"name": "read", "arguments": "{}"}},
             ]}
-        elif "sequential" in marker:
+        elif "sequential" in marker and not has_tool_result:
             message = {"role": "assistant", "tool_calls": [
                 {"id": "call-1", "type": "function", "function": {"name": "read", "arguments": "{}"}},
             ]}
+        elif "reasoning" in marker and request.get("reasoning"):
+            message = {"role": "assistant", "content": "CONTRACT_OK",
+                       "reasoning_content": "fixture reasoning"}
+        elif "NEEDLE-31K-7F3A" in marker:
+            message = {"role": "assistant", "content": "NEEDLE-31K-7F3A"}
+        elif "code-generation" in marker:
+            message = {"role": "assistant", "content": "def add(a, b):\\n    return a + b"}
+        elif "fixture_target" in marker:
+            message = {"role": "assistant", "content": "src/fixture_target.py line 3"}
+        elif "PRESERVE-USER-CONTENT" in marker:
+            message = {"role": "assistant", "content": "PRESERVE-USER-CONTENT"}
         else:
             message = {"role": "assistant", "content": "CONTRACT_OK"}
         response = {"id": "chatcmpl-fixture", "object": "chat.completion",

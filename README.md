@@ -49,6 +49,23 @@ The script currently supports dependency installation on Arch Linux and Debian/U
 
 The verified Issue #5 Vulkan/Q8_0 baseline and reproducible command are documented in [`docs/issue-5-direct-baseline-result.md`](docs/issue-5-direct-baseline-result.md).
 
+## Issue #11 evaluation
+
+Run the portable evaluation gate with the deterministic OpenAI-compatible
+fixture; no large model is needed:
+
+```bash
+python3 tests/fixtures/fake_openai_endpoint.py --port 8089
+scripts/run-evaluation.sh --endpoint http://127.0.0.1:8089 \
+  --cases tests/fixtures/evaluation_cases.json \
+  --workspace /path/to/disposable-repo --artifacts results/evaluation.json
+```
+
+The runner uses a temporary workspace copy, an allowlisted command fixture,
+bounded sanitized artifacts, and the report contract in
+[`schemas/evaluation-report.schema.json`](schemas/evaluation-report.schema.json).
+See [`docs/issue-11-evaluation.md`](docs/issue-11-evaluation.md).
+
 ## Security
 
 Do not store sudo passwords, API keys, or model-access tokens in this repository. Model files and local `.env` files are ignored by Git.

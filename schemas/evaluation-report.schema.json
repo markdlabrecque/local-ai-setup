@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/markdlabrecque/local-ai-setup/schemas/evaluation-report.schema.json",
+  "title": "Issue 11 evaluation report",
+  "type": "object",
+  "required": ["schema_version", "suite", "cases", "scoring", "provenance", "safety"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "suite": {
+      "type": "object",
+      "required": ["name", "case_count", "all_required_cases_passed", "score"],
+      "properties": {
+        "name": {"const": "issue-11-evaluation"},
+        "case_count": {"type": "integer", "minimum": 1},
+        "context_target_tokens": {"type": "integer", "minimum": 32000},
+        "all_required_cases_passed": {"type": "boolean"},
+        "score": {"type": "number", "minimum": 0, "maximum": 1}
+      },
+      "additionalProperties": true
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "passed", "score", "checks"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+          "kind": {"type": "string"},
+          "passed": {"type": "boolean"},
+          "score": {"type": "number", "minimum": 0, "maximum": 1},
+          "checks": {"type": "object"}
+        },
+        "additionalProperties": true
+      }
+    },
+    "scoring": {
+      "type": "object",
+      "required": ["method", "score", "passed"],
+      "properties": {
+        "method": {"const": "mean-case-score"},
+        "score": {"type": "number", "minimum": 0, "maximum": 1},
+        "passed": {"type": "boolean"}
+      },
+      "additionalProperties": true
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["request_id", "transcript", "sanitized"],
+      "properties": {
+        "request_id": {"type": "string", "minLength": 1},
+        "transcript": {"type": "array", "maxItems": 64},
+        "sanitized": {"const": true},
+        "deterministic_requests": {"type": "boolean"}
+      },
+      "additionalProperties": true
+    },
+    "safety": {
+      "type": "object",
+      "required": ["workspace_unchanged", "sandboxed", "bounded_artifacts"],
+      "properties": {
+        "workspace_unchanged": {"const": true},
+        "sandboxed": {"const": true},
+        "bounded_artifacts": {"const": true},
+        "model_commands_executed": {"const": false}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}
