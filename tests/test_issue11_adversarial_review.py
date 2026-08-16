@@ -88,8 +88,8 @@ class ReviewFixture(BaseHTTPRequestHandler):
             self._reply(self._completion("late"))
             return
 
-        if mode == "overflow" and "PRESERVE-USER-CONTENT" not in marker:
-            if len(marker) > 100000:
+        if mode == "overflow" and request.get("eval_overflow_probe"):
+            if "PRESERVE-USER-CONTENT" in marker and len(marker) > 100000:
                 self._reply({"error": {"type": "context_length_exceeded"}}, 400)
                 return
 

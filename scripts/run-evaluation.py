@@ -295,13 +295,16 @@ def execute_read_tool(call: dict, sandbox: Path) -> str:
 
 
 def call_for_case(endpoint: str, case: dict, prompt: str, reasoning: bool = False,
-                  attempt: int = 1, extra_messages: list[dict] | None = None) -> tuple[dict, dict]:
+                  attempt: int = 1, extra_messages: list[dict] | None = None,
+                  extra_payload: dict | None = None) -> tuple[dict, dict]:
     messages = [{"role": "user", "content": prompt}]
     if extra_messages:
         messages.extend(extra_messages)
     payload = {"model": "fixture-model", "messages": messages, "temperature": 0,
                "top_p": 1, "seed": 11, "stream": False,
                "reasoning": reasoning, "max_tokens": 256}
+    if extra_payload:
+        payload.update(extra_payload)
     rid = request_id(case["id"], attempt, payload)
     response, body_hash, response_hash = post_json(endpoint, payload)
     choices = response.get("choices", [])
@@ -536,13 +539,14 @@ def run_case(case: dict, endpoint: str, sandbox: Path) -> tuple[dict, list[dict]
 
     if kind == "overflow":
         marker = "PRESERVE-USER-CONTENT"
-        # The deliberately oversized first request contains only discardable
-        # history. The compact retry introduces and must preserve current user
-        # content, making the two phases unambiguous to fixtures and reports.
-        oversized = "context " * 32000
+        # The oversized first request contains the current user marker. A
+        # protocol-only probe flag lets deterministic endpoints distinguish it
+        # from the compact retry without weakening content-preservation proof.
+        oversized = ("context " * 32000) + marker
         overflow_observed = False
         try:
-            _response, trace = call_for_case(endpoint, case, "overflow " + oversized)
+            _response, trace = call_for_case(endpoint, case, "overflow " + oversized,
+                                             extra_payload={"eval_overflow_probe": True})
             transcripts.append(trace)
         except EndpointError as error:
             error_text = canonical(error.body).lower() if error.body is not None else ""

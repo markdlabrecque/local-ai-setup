@@ -42,7 +42,7 @@ class Handler(BaseHTTPRequestHandler):
             time.sleep(0.25)
         # The first overflow attempt must observe a real OpenAI-style context
         # error before the evaluator may claim a compacted retry.
-        if "overflow " in marker and len(marker) > 200000 and "overflow compacted context" not in marker:
+        if request.get("eval_overflow_probe") and "PRESERVE-USER-CONTENT" in marker and len(marker) > 200000:
             self._reply({"error": {"message": "context length exceeded",
                                    "type": "context_length_exceeded",
                                    "code": "context_length_exceeded"}}, 400)

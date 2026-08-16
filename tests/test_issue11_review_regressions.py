@@ -90,10 +90,10 @@ class AdversarialEndpoint(BaseHTTPRequestHandler):
                                       "finish_reason": "stop"}]})
             return
 
-        if mode == "overflow" and "PRESERVE-USER-CONTENT" not in marker:
-            # The first oversized request must cause a real retry, not a
-            # report-only compaction flag.
-            if len(marker) > 30000:
+        if mode == "overflow" and payload.get("eval_overflow_probe"):
+            # The first oversized request must contain current user content
+            # and cause a real retry, not a report-only compaction flag.
+            if "PRESERVE-USER-CONTENT" in marker and len(marker) > 30000:
                 self._reply({"error": {"type": "context_length_exceeded"}}, 400)
                 return
 
