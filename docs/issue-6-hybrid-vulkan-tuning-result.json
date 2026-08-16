@@ -1,0 +1,202 @@
+{
+  "build": {
+    "commit": "adb55e5",
+    "ref": "b10446"
+  },
+  "context_tokens": 32768,
+  "matrix": {
+    "batch": [
+      256
+    ],
+    "flash_attention": [
+      "on",
+      "off"
+    ],
+    "gpu_layers": [
+      16,
+      20
+    ],
+    "kv_cache": [
+      "q8_0"
+    ],
+    "ubatch": [
+      128
+    ]
+  },
+  "model": {
+    "id": "Qwen3.5-27B-Q8_0",
+    "quantization": "Q8_0",
+    "sha256": "6b0a101b0a86697fe11eabcc1a7db72699a9f3d4b18b6a1ac75ea3fb2c26c450"
+  },
+  "prompt": "Respond with exactly: LOCAL_AI_HYBRID_TUNING_OK",
+  "resumability": {
+    "config_sha256": "8ff8cccb7a970a95ec3bdc11008413d9292f356acdaef2d61974b0b4a190f604",
+    "key": "parameter_tuple"
+  },
+  "runs": [
+    {
+      "lifecycle": {
+        "bounded": true,
+        "finished": true,
+        "started": true
+      },
+      "metrics": {
+        "exit_code": 0,
+        "generation_tokens_per_second": 2.4,
+        "min_mem_available_mib": 54101,
+        "peak_vram_mib": 8643,
+        "prompt_tokens_per_second": 18.9,
+        "swap_in_pages": 0,
+        "time_to_first_token_ms": 1322.81,
+        "timed_out": false,
+        "vram_capacity_mib": 16368
+      },
+      "parameters": {
+        "batch": 256,
+        "flash_attention": "on",
+        "gpu_layers": 16,
+        "kv_cache": "q8_0",
+        "quantization": "Q8_0",
+        "ubatch": 128
+      },
+      "quality": {
+        "context_confirmed": true,
+        "device_confirmed": true,
+        "exact_completion": true,
+        "passed": true
+      },
+      "status": "pass"
+    },
+    {
+      "lifecycle": {
+        "bounded": true,
+        "finished": true,
+        "started": true
+      },
+      "metrics": {
+        "exit_code": 0,
+        "generation_tokens_per_second": 2.43,
+        "min_mem_available_mib": 53745,
+        "peak_vram_mib": 9003,
+        "prompt_tokens_per_second": 18.26,
+        "swap_in_pages": 0,
+        "time_to_first_token_ms": 1368.99,
+        "timed_out": false,
+        "vram_capacity_mib": 16368
+      },
+      "parameters": {
+        "batch": 256,
+        "flash_attention": "off",
+        "gpu_layers": 16,
+        "kv_cache": "q8_0",
+        "quantization": "Q8_0",
+        "ubatch": 128
+      },
+      "quality": {
+        "context_confirmed": true,
+        "device_confirmed": true,
+        "exact_completion": true,
+        "passed": true
+      },
+      "status": "pass"
+    },
+    {
+      "lifecycle": {
+        "bounded": true,
+        "finished": true,
+        "started": true
+      },
+      "metrics": {
+        "exit_code": 0,
+        "generation_tokens_per_second": 2.57,
+        "min_mem_available_mib": 54250,
+        "peak_vram_mib": 10293,
+        "prompt_tokens_per_second": 20.15,
+        "swap_in_pages": 0,
+        "time_to_first_token_ms": 1240.73,
+        "timed_out": false,
+        "vram_capacity_mib": 16368
+      },
+      "parameters": {
+        "batch": 256,
+        "flash_attention": "on",
+        "gpu_layers": 20,
+        "kv_cache": "q8_0",
+        "quantization": "Q8_0",
+        "ubatch": 128
+      },
+      "quality": {
+        "context_confirmed": true,
+        "device_confirmed": true,
+        "exact_completion": true,
+        "passed": true
+      },
+      "status": "pass"
+    },
+    {
+      "lifecycle": {
+        "bounded": true,
+        "finished": true,
+        "started": true
+      },
+      "metrics": {
+        "exit_code": 0,
+        "generation_tokens_per_second": 2.57,
+        "min_mem_available_mib": 53849,
+        "peak_vram_mib": 10653,
+        "prompt_tokens_per_second": 19.51,
+        "swap_in_pages": 0,
+        "time_to_first_token_ms": 1281.2,
+        "timed_out": false,
+        "vram_capacity_mib": 16368
+      },
+      "parameters": {
+        "batch": 256,
+        "flash_attention": "off",
+        "gpu_layers": 20,
+        "kv_cache": "q8_0",
+        "quantization": "Q8_0",
+        "ubatch": 128
+      },
+      "quality": {
+        "context_confirmed": true,
+        "device_confirmed": true,
+        "exact_completion": true,
+        "passed": true
+      },
+      "status": "pass"
+    }
+  ],
+  "safety": {
+    "maximum_swap_in_pages": 0,
+    "minimum_mem_available_mib": 8192,
+    "minimum_vram_free_mib": 1024
+  },
+  "schema_version": "hybrid-vulkan-tuning-v1",
+  "selection": {
+    "candidate_count": 4,
+    "deterministic": true,
+    "policy": "quality-pass, generation-tps desc, prompt-tps desc, TTFT asc, VRAM asc, parameter tuple asc"
+  },
+  "stable_candidate": {
+    "metrics": {
+      "exit_code": 0,
+      "generation_tokens_per_second": 2.57,
+      "min_mem_available_mib": 54250,
+      "peak_vram_mib": 10293,
+      "prompt_tokens_per_second": 20.15,
+      "swap_in_pages": 0,
+      "time_to_first_token_ms": 1240.73,
+      "timed_out": false,
+      "vram_capacity_mib": 16368
+    },
+    "parameters": {
+      "batch": 256,
+      "flash_attention": "on",
+      "gpu_layers": 20,
+      "kv_cache": "q8_0",
+      "quantization": "Q8_0",
+      "ubatch": 128
+    }
+  }
+}

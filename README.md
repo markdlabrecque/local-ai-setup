@@ -49,6 +49,10 @@ The script currently supports dependency installation on Arch Linux and Debian/U
 
 The verified Issue #5 Vulkan/Q8_0 baseline and reproducible command are documented in [`docs/issue-5-direct-baseline-result.md`](docs/issue-5-direct-baseline-result.md).
 
+## Hybrid Vulkan tuning
+
+The resumable Q8_0 tuning harness, pinned matrix, and sanitized RX 6900 XT result are documented in [`docs/issue-6-hybrid-vulkan-tuning-result.md`](docs/issue-6-hybrid-vulkan-tuning-result.md).
+
 ## Security
 
 Do not store sudo passwords, API keys, or model-access tokens in this repository. Model files and local `.env` files are ignored by Git.
